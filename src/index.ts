@@ -1,0 +1,64 @@
+import "dotenv/config";
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
+import { ensurePgVector } from "./db/client.js";
+import health from "./api/health.js";
+import ingest from "./api/ingest.js";
+import chat from "./api/chat.js";
+import conversationsRouter from "./api/conversations.js";
+
+const app = new Hono();
+
+// Middleware
+app.use("*", logger());
+app.use("*", secureHeaders());
+app.use(
+  "*",
+  cors({
+    origin: process.env["ALLOWED_ORIGINS"]?.split(",") ?? "*",
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+  })
+);
+
+// Routes
+app.route("/health", health);
+app.route("/ingest", ingest);
+app.route("/chat", chat);
+app.route("/conversations", conversationsRouter);
+
+// 404 handler
+app.notFound((c) => c.json({ error: "Not found" }, 404));
+
+// Error handler
+app.onError((err, c) => {
+  console.error("[error]", err);
+  return c.json(
+    { error: "Internal server error", message: err.message },
+    500
+  );
+});
+
+// Startup
+const PORT = Number(process.env["PORT"] ?? 3000);
+
+async function main() {
+  // Ensure pgvector extension is installed
+  await ensurePgVector();
+  console.log("[startup] pgvector extension ready");
+
+  serve({ fetch: app.fetch, port: PORT }, () => {
+    console.log(`[startup] rag-agent-backbone running on http://localhost:${PORT}`);
+    console.log(`[startup] Environment: ${process.env["NODE_ENV"] ?? "development"}`);
+  });
+}
+
+main().catch((err) => {
+  console.error("[fatal] Failed to start server:", err);
+  process.exit(1);
+});
+
+export default app;

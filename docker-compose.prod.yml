@@ -1,0 +1,28 @@
+version: "3.9"
+
+# Producción con Railway (app) + Supabase (DB)
+# Las variables de entorno se configuran en Railway dashboard
+# No se incluye postgres ni ollama (se usan servicios cloud)
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      # Configurados en Railway:
+      # DATABASE_URL (Supabase con pgvector habilitado)
+      # ANTHROPIC_API_KEY
+      # OPENAI_API_KEY
+      # LANGFUSE_SECRET_KEY (opcional)
+      # LANGFUSE_PUBLIC_KEY (opcional)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

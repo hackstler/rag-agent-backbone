@@ -1,0 +1,29 @@
+node_modules/
+dist/
+.env
+CLAUDE.local.md
+*.local.md
+
+# Build artifacts
+*.js.map
+*.d.ts.map
+
+# Test coverage
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Drizzle
+drizzle/
+
+# Logs
+*.log
+logs/

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(docker-compose *)",
+      "Bash(docker *)",
+      "Bash(npx drizzle-kit *)",
+      "Bash(curl http://localhost:*)",
+      "Bash(curl https://api.*)",
+      "Bash(git *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo *)",
+      "Bash(chmod 777 *)"
+    ]
+  }
+}
