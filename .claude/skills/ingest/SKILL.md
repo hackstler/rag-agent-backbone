@@ -58,5 +58,6 @@ Chunka, embebe y almacena el documento, luego confirma que el retrieval funciona
 
 ## Errores comunes
 - **"Document produced no chunks"**: archivo vacío o formato no soportado
-- **"Ollama embedding failed"**: Ollama no está corriendo (`docker-compose up ollama`)
-- **"OPENAI_API_KEY required"**: falta la API key en `.env`
+- **"Embedding failed"**: verifica que `GOOGLE_API_KEY` está en `.env` y es válida
+- **"connect ECONNREFUSED"**: el servidor no está corriendo — ejecuta `npm run dev`
+- **"relation does not exist"**: migraciones no aplicadas — ejecuta `npm run migrate`

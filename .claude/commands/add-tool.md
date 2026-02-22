@@ -1,121 +1,253 @@
 # /add-tool
 
-Add a new Mastra tool to the agent's tool registry.
+Añade una nueva tool al agente siguiendo el patrón ToolEntry.
 
-## Usage
-/add-tool <tool-name> "<description>"
+## Uso
 
-Examples:
-- /add-tool summarize-document "Summarizes a document by ID"
-- /add-tool list-documents "Lists all indexed documents with metadata"
+```
+/add-tool                              # modo interactivo — wizard por tipos
+/add-tool <tool-name> "<description>"  # modo directo — genera con lo que ya sabes
+```
 
-## What this skill does
+Ejemplos:
+```
+/add-tool
+/add-tool book-appointment "Creates and queries appointments via REST API"
+/add-tool get-client-data "Queries client profile from PostgreSQL"
+```
 
-1. Reads `src/agent/tools/search-documents.ts` as the reference pattern
-2. Reads `src/agent/tools/base.ts` for `ToolEntry` and `ToolRegistryDeps`
-3. Reads `src/agent/tools/index.ts` to ver `ALL_TOOLS`
-4. Reads `src/config/tools.config.ts` para ver las tools activas
-5. Genera `src/agent/tools/<tool-name>.ts` con:
-   - `create<PascalCase>Tool(deps)` — factory function
-   - `<camelCase>Entry: ToolEntry` — self-registering entry
-   - `inputSchema` con Zod + `.describe()` en cada campo
-   - `outputSchema`
-   - `execute` con la lógica
-   - `deps: ToolRegistryDeps` solo si la tool necesita embedder/retriever/reranker
-6. Añade la entrada en `ALL_TOOLS` en `tools/index.ts` (un import + una línea)
-7. Añade la key en `src/config/tools.config.ts` (una línea)
-8. Ejecuta `npx tsc --noEmit` para verificar tipos
-9. Muestra el diff al usuario
+---
 
-## Instructions for Claude
+## Instrucciones para Claude
 
-When this skill is invoked:
+### Paso 1 — Determinar modo
 
-### Step 1 — Parse arguments
-- Tool name: kebab-case → filename `<tool-name>.ts`
-- Factory function: `create<PascalCase>Tool`
+**Si se invocó sin argumentos (`/add-tool` solo):**
+
+Pregunta el tipo de tool:
+
+> "¿Qué tipo de integración necesitas?
+>
+> **A) REST API externa** — llama a un endpoint HTTP de un servicio externo
+> **B) Base de datos** — consulta o escribe en la PostgreSQL del proyecto
+> **C) Script externo** — ejecuta un script Python, Node o bash y usa su output
+> **D) Lógica interna** — computación TypeScript pura, sin dependencias externas"
+
+Según la respuesta, haz las preguntas específicas del tipo (ver sección siguiente).
+Al terminar el árbol de preguntas tienes todo lo necesario — salta al Paso 2.
+
+**Si se invocó con argumentos:**
+Infiere el tipo de la descripción y pasa directamente al Paso 2.
+Si el tipo no queda claro de la descripción, pregunta antes de generar.
+
+---
+
+### Árboles de preguntas por tipo
+
+#### Tipo A — REST API externa
+
+1. ¿Nombre de la tool? (kebab-case, ej: `book-appointment`)
+2. ¿Qué hace? ¿Cuándo debe llamarla el agente? (1-2 frases — esto es la `description` de la tool)
+3. ¿URL base del API? (ej: `https://api.booking.io/v2`)
+4. ¿Autenticación?
+   - Ninguna
+   - API key en header → ¿nombre del header? + ¿nombre de la env var? (ej: `X-Api-Key`, `BOOKING_API_KEY`)
+   - Bearer token → ¿nombre de la env var? (ej: `BOOKING_TOKEN`)
+   - Basic auth → ¿nombres de las env vars para user y password?
+5. ¿Qué operaciones necesita el agente? (lista: método + path + para qué)
+   Ej: `GET /slots → consultar disponibilidad`, `POST /appointments → crear cita`
+6. ¿Ejemplo de response JSON de la operación principal? (pega uno o describe los campos que devuelve)
+
+---
+
+#### Tipo B — Base de datos (PostgreSQL del proyecto)
+
+1. ¿Nombre de la tool? (kebab-case)
+2. ¿Qué hace? ¿Cuándo debe llamarla el agente?
+3. ¿Qué tabla(s) involucra?
+4. ¿Qué consulta ejecuta? (describe con palabras o escribe el SQL directamente)
+5. ¿Solo lectura o también escribe? (si escribe: ¿qué campos muta?)
+6. ¿Qué campos devuelve al agente? (solo los relevantes, nunca `SELECT *`)
+
+---
+
+#### Tipo C — Script externo
+
+1. ¿Nombre de la tool? (kebab-case)
+2. ¿Qué hace? ¿Cuándo debe llamarla el agente?
+3. Ruta del script relativa al proyecto (ej: `scripts/analyze.py`)
+4. Runtime: `python3` / `node` / `bash`
+5. ¿Qué input recibe? (lista: nombre + tipo, ej: `imageUrl: string`, `threshold: number`)
+6. ¿Formato del output? `JSON en stdout` / `CSV` / `texto plano`
+
+---
+
+#### Tipo D — Lógica interna
+
+1. ¿Nombre de la tool? (kebab-case)
+2. ¿Qué hace? ¿Cuándo debe llamarla el agente?
+3. ¿Qué input recibe? (campos con tipos y descripción breve)
+4. ¿Qué devuelve? (campos con tipos)
+5. ¿Algún paquete npm necesario? (si sí: nombre + para qué lo usa)
+
+---
+
+### Paso 2 — Leer archivos de referencia (en paralelo)
+
+- `src/agent/tools/search-web.ts` — patrón ToolEntry sin deps (el más común)
+- `src/agent/tools/base.ts` — interfaces ToolEntry + ToolRegistryDeps
+- `src/agent/tools/index.ts` — ALL_TOOLS array actual
+- `src/config/tools.config.ts` — toolsConfig actual
+
+### Paso 3 — Derivar nombres
+
+Del `<tool-name>` en kebab-case:
+- Filename: `<tool-name>.ts`
+- Factory: `create<PascalCase>Tool`
 - Entry export: `<camelCase>Entry`
 - Registry key: `<camelCase>`
 
-### Step 2 — Read these files first
-- `src/agent/tools/search-documents.ts` — reference pattern
-- `src/agent/tools/base.ts` — ToolEntry + ToolRegistryDeps
-- `src/agent/tools/index.ts` — ALL_TOOLS array
-- `src/config/tools.config.ts` — active tools config
+### Paso 4 — Decidir deps
 
-### Step 3 — Decide deps
-- Needs `ToolRegistryDeps` if the tool searches documents (embedder/retriever/reranker)
-- Does NOT need deps if it's an external API, utility, or doesn't touch pgvector
+Los tipos A, B, C, D **no necesitan ToolRegistryDeps** (no hacen búsqueda vectorial).
+Usa `(_deps)` en `Entry.create` y no incluyas `deps` en la factory function.
 
-### Step 4 — Generate `src/agent/tools/<tool-name>.ts`
+### Paso 5 — Generar `src/agent/tools/<tool-name>.ts`
+
+Estructura base:
 
 ```typescript
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { ToolEntry, ToolRegistryDeps } from "./base.js";
-// import { ragConfig } from "../../config/rag.config.js"; // if needed
 
 /**
- * <Description: what it does and when the agent should call it>
+ * <descripción: qué hace y cuándo debe llamarla el agente>
  */
 export const <camelCase>Entry: ToolEntry = {
   key: "<camelCase>",
-  create: (deps) => create<PascalCase>Tool(deps), // or (_deps) if no RAG deps
+  create: (_deps) => create<PascalCase>Tool(),
 };
 
-export function create<PascalCase>Tool(deps: ToolRegistryDeps) {
+export function create<PascalCase>Tool() {
   return createTool({
     id: "<tool-name>",
-    description: `<Clear description.
-WHEN to call it. WHAT it returns.>`,
+    description: `<descripción clara.
+CUÁNDO llamarla. QUÉ devuelve.>`,
     inputSchema: z.object({
-      // every field must have .describe()
+      // Todos los campos con .describe()
+      // campo: z.tipo().describe("descripción del campo"),
     }),
     outputSchema: z.object({
-      // typed return shape
+      // Shape tipado del return
     }),
-    execute: async ({ /* input fields */ }) => {
-      // implementation using deps.embedder / deps.retriever / deps.reranker if needed
+    execute: async (input) => {
+      // Implementación según tipo (ver plantillas abajo)
     },
   });
 }
 ```
 
-### Step 5 — Update `src/agent/tools/index.ts`
+**Plantilla Tipo A — fetch con auth:**
+```typescript
+const BASE_URL = "https://api.servicio.com/v1";
 
-Add import and entry to `ALL_TOOLS`:
+execute: async ({ operationInput }) => {
+  const apiKey = process.env["SERVICE_API_KEY"];
+  const res = await fetch(`${BASE_URL}/endpoint`, {
+    method: "GET", // o POST con body: JSON.stringify({...})
+    headers: {
+      "X-Api-Key": apiKey ?? "",
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
+  const data = await res.json() as { /* shape tipado */ };
+  return { /* campos del outputSchema */ };
+},
+```
+
+**Plantilla Tipo B — Drizzle query:**
+```typescript
+import { db } from "../../db/client.js";
+import { myTable } from "../../db/schema.js";
+import { eq } from "drizzle-orm";
+
+execute: async ({ id }) => {
+  const rows = await db
+    .select({ field1: myTable.field1, field2: myTable.field2 })
+    .from(myTable)
+    .where(eq(myTable.id, id));
+  return { results: rows, count: rows.length };
+},
+```
+
+**Plantilla Tipo C — script externo:**
+```typescript
+import { execFileSync } from "child_process";
+import path from "path";
+
+execute: async ({ inputParam }) => {
+  const scriptPath = path.resolve("scripts/my-script.py");
+  const output = execFileSync("python3", [scriptPath, inputParam], {
+    encoding: "utf8",
+  });
+  return JSON.parse(output) as { /* shape tipado */ };
+},
+```
+
+**Plantilla Tipo D — lógica interna:**
+```typescript
+execute: async ({ inputFields }) => {
+  // Computación TypeScript pura
+  const result = /* lógica */;
+  return { result };
+},
+```
+
+### Paso 6 — Actualizar `src/agent/tools/index.ts`
 
 ```typescript
-import { <camelCase>Entry } from "./<tool-name>.js"; // ← add import
+import { <camelCase>Entry } from "./<tool-name>.js";  // ← añadir import
 
 const ALL_TOOLS: ToolEntry[] = [
   searchDocumentsEntry,
   searchWebEntry,
-  <camelCase>Entry,  // ← add here
+  <camelCase>Entry,  // ← añadir aquí
 ];
 ```
 
-### Step 6 — Update `src/config/tools.config.ts`
+### Paso 7 — Actualizar `src/config/tools.config.ts`
 
 ```typescript
-export const toolsConfig = {
-  searchDocuments: { enabled: true, description: "..." },
-  searchWeb:       { enabled: ...,  description: "..." },
-  <camelCase>:     { enabled: true, description: "<one-line description>" }, // ← add
-} satisfies Record<string, { enabled: boolean; description: string }>;
+<camelCase>: {
+  enabled: true,
+  // Si depende de una API key: enabled: Boolean(process.env["MY_API_KEY"])
+  description: "<descripción en una línea>",
+},
 ```
 
-### Step 7 — Validate
+### Paso 8 — Validar tipos
+
 ```bash
 npx tsc --noEmit
 ```
 
-### Step 8 — Show diff
-Show the user the new file + changes to `index.ts` and `tools.config.ts`.
+### Paso 9 — Mostrar resumen al developer
 
-## Rules
-- Never modify existing tool files (Open/Closed principle)
-- Use `z.string().describe("...")` on every input field
-- Always export both the `Entry` (for registry) and the `create*Tool` factory (for direct use)
-- Naming: filename kebab-case, factory PascalCase, entry/key camelCase
-- If the tool auto-enables based on an env var, use `enabled: Boolean(process.env["MY_KEY"])` in tools.config.ts
+- Archivo nuevo creado y su ruta
+- Cambios en `index.ts` (líneas añadidas)
+- Cambios en `tools.config.ts` (líneas añadidas)
+- Variables de entorno necesarias (nombre sugerido + dónde añadirlas en `.env`)
+- Paquetes npm a instalar (si aplica)
+
+---
+
+## Reglas
+
+- **Open/Closed**: nunca modificar archivos de tools existentes
+- `z.tipo().describe("...")` en **cada** campo de `inputSchema`
+- Siempre exportar tanto el `Entry` como la factory function
+- Naming: filename kebab-case · factory PascalCase · entry/key camelCase
+- Si la tool requiere una env var: añadirla comentada a `.env.example`
+- Si falta información para generar (ej: no sé el shape del response de la API), pregunta antes de generar código incompleto

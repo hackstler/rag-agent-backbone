@@ -1,39 +1,75 @@
 # rag-agent-backbone
 
 ## Propósito
-Template production-ready para desplegar agentes RAG de nivel empresarial. Cualquier equipo puede copiar este repo, responder el `initial-setup.md` y tener infraestructura RAG lista sin configurar nada desde cero.
+Template production-ready para desplegar agentes RAG especializados por cliente.
+Clona el repo, ejecuta `/setup` en Claude Code, y tienes el agente configurado y listo para ingestar documentos.
 
-## Stack Técnico
+## Stack Técnico (fijo — no configurable)
 - **Runtime**: Node.js + TypeScript strict
 - **API**: Hono (edge-first, SSE nativo)
 - **LLM Orchestration**: Mastra.ai (TypeScript nativo, RAG module nativo)
 - **Vector DB**: PostgreSQL + pgvector (un solo DATABASE_URL)
 - **ORM**: Drizzle (lightweight, SQL-first)
-- **Embeddings (prod)**: OpenAI `text-embedding-3-small` (1536-dim)
-- **Embeddings (local)**: Ollama `nomic-embed-text`
-- **LLM (prod)**: Claude 3.5 Sonnet
-- **LLM (local)**: Ollama `mistral`
+- **Embeddings**: Gemini `gemini-embedding-001` (768-dim, GOOGLE_API_KEY)
+- **LLM**: Gemini `gemini-2.5-flash` (configurable via GEMINI_MODEL)
 - **Streaming**: SSE via Hono
-- **Deploy local**: Docker Compose (postgres+pgvector + ollama + app)
+- **Deploy local**: Docker Compose (postgres+pgvector + app)
 - **Deploy prod**: Railway (API) + Supabase (DB)
+
+## Comandos Claude Code
+
+| Comando | Cuándo usarlo |
+|---------|---------------|
+| `/setup` | Primera vez con un cliente. Configura nombre, caso de uso, idioma, web search. |
+| `/add-tool` | Añadir una integración nueva (REST API, DB, script, lógica interna). |
+| `/status` | Ver configuración activa, tools registradas y estado del servidor. |
+| `/ingest [path\|url]` | Ingestar un documento o URL en el vector store. |
+| `/test-rag [query]` | Probar el retrieval y ver los chunks recuperados con sus scores. |
+| `/tune-retrieval` | Diagnosticar problemas de calidad de retrieval y proponer ajustes. |
+| `/benchmark` | Ejecutar suite de benchmarks de retrieval. |
+
+## Flujo para un cliente nuevo
+
+```
+1. git clone rag-agent-backbone <nombre-proyecto>  &&  cd <nombre-proyecto>
+2. npm install
+3. /setup                    →  4 preguntas  →  archivos configurados
+4. cp .env.example .env      →  añade GOOGLE_API_KEY y las keys que /setup indique
+5. docker-compose up         →  PostgreSQL + pgvector
+6. npm run migrate           →  aplica schema
+7. npm run dev               →  servidor en :3000
+8. /ingest ./docs/           →  indexa los documentos del cliente
+9. POST /chat {"query":"..."}  →  prueba el agente
+```
+
+## Añadir una integración
+
+```
+/add-tool
+→ elige tipo: REST API / Base de datos / Script externo / Lógica interna
+→ responde las preguntas del tipo
+→ código generado + tsc validado
+```
 
 ## Estructura clave
 ```
-src/api/       → Hono routes (chat, ingest, conversations, health)
-src/rag/       → Pipeline RAG Mastra (pipeline, retriever, reranker, chunker)
-src/ingestion/ → Document ingestion (loader, processor, watcher)
-src/db/        → Drizzle schema + migrations + client
-src/config/    → rag.config.ts generado por initial-setup.md
-references/    → Git subtrees de repos oficiales (LangChain + Vercel AI SDK)
+src/api/           → Hono routes (chat, ingest, conversations, health)
+src/rag/           → interfaces.ts + adapters.ts + retriever + reranker + chunker
+src/agent/         → rag-agent.ts + workflow.ts
+src/agent/tools/   → tool factory pattern (ToolEntry)
+src/ingestion/     → Document ingestion (loader, processor)
+src/db/            → Drizzle schema + migrations + client
+src/config/        → rag.config.ts + tools.config.ts
 ```
 
 ## Convenciones
-- Toda la configuración vive en `src/config/rag.config.ts` (generada por wizard)
+- Toda la config vive en `src/config/` — generada y modificada por los comandos Claude Code
+- Añadir una tool = crear `src/agent/tools/my-tool.ts` + una línea en `tools/index.ts` + una línea en `tools.config.ts`
+- Cambiar embedder/retriever/reranker = solo modificar `src/rag/adapters.ts`
+- Secrets siempre en `.env`, nunca hardcoded — usar `process.env["VAR"]` (con corchetes)
 - Local ↔ Producción: mismo código, solo variables de entorno cambian
-- Sin choices ambiguas en runtime: stack fijo y determinista
-- Secrets siempre en `.env`, nunca hardcoded
 
-## Comandos principales
+## Comandos npm
 ```bash
 npm run dev          # Development con hot reload
 npm run build        # Build producción
@@ -45,15 +81,13 @@ docker-compose up    # Stack local completo
 
 ## Variables de entorno requeridas
 Ver `.env.example` para la lista completa.
-Mínimo para local: `DATABASE_URL` (o usa docker-compose que lo configura)
-Mínimo para prod: `DATABASE_URL` + `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`
-
-## Referencia de patrones RAG
-Ver `RAG-REFERENCE.md` para cheatsheet de patrones y decisiones de diseño.
+Mínimo para local: `DATABASE_URL` + `GOOGLE_API_KEY`
+Mínimo para prod: `DATABASE_URL` + `GOOGLE_API_KEY` (+ `PERPLEXITY_API_KEY` si web search activo)
 
 ## Setup inicial
-Responder `initial-setup.md` genera automáticamente:
+Ejecuta `/setup` en Claude Code. Te hará 4 preguntas y actualizará directamente:
 - `src/config/rag.config.ts`
-- `.env.example` adaptado al caso de uso
-- `docker-compose.yml` con servicios necesarios
-- Actualiza este `CLAUDE.md` con el contexto del proyecto
+- `src/config/tools.config.ts`
+- `.env.example`
+- `CLAUDE.md` (sección Propósito)
+- `setup-responses.md` (memoria del wizard para futuras sesiones)
