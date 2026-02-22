@@ -1,9 +1,6 @@
-import type { RetrievedChunk } from "./retriever.js";
+import type { RetrievedChunk, RerankerOptions } from "./interfaces.js";
 
-export interface RerankerOptions {
-  topK: number;
-  provider: "cohere" | "local";
-}
+export type { RerankerOptions };
 
 /**
  * Rerank retrieved chunks using a cross-encoder model.

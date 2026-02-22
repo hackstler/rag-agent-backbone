@@ -2,23 +2,9 @@ import { db } from "../db/client.js";
 import { documentChunks, documents } from "../db/schema.js";
 import { sql, eq, and } from "drizzle-orm";
 import type { DocumentChunk } from "../db/schema.js";
+import type { RetrievedChunk, RetrieverOptions } from "./interfaces.js";
 
-export interface RetrievedChunk {
-  id: string;
-  content: string;
-  score: number;
-  documentId: string;
-  documentTitle: string;
-  documentSource: string;
-  metadata: DocumentChunk["chunkMetadata"];
-}
-
-export interface RetrieverOptions {
-  topK: number;
-  similarityThreshold: number;
-  orgId?: string;
-  documentIds?: string[];
-}
+export type { RetrievedChunk, RetrieverOptions };
 
 /**
  * Retrieve relevant chunks using cosine similarity search on pgvector.

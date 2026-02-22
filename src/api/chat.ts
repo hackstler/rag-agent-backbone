@@ -1,11 +1,10 @@
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
-import { runRagPipeline, runRagPipelineStream } from "../rag/pipeline.js";
+import { ragAgent } from "../agent/index.js";
 import { db } from "../db/client.js";
 import { messages, conversations } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "crypto";
 
 const chat = new Hono();
 
@@ -18,8 +17,7 @@ const chatSchema = z.object({
 
 /**
  * POST /chat
- * Send a message and get a complete JSON response.
- * Creates a new conversation if no conversationId is provided.
+ * Non-streaming: agent decides which tools to call, returns complete answer.
  */
 chat.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -29,42 +27,41 @@ chat.post("/", async (c) => {
     return c.json({ error: parsed.error.message }, 400);
   }
 
-  const { query, orgId, documentIds } = parsed.data;
+  const { query, orgId } = parsed.data;
   const conversationId = await resolveConversationId(parsed.data.conversationId);
 
-  const startTime = Date.now();
-  const result = await runRagPipeline({ query, conversationId, orgId, documentIds });
+  const result = await ragAgent.generate(query, {
+    threadId: conversationId,
+    resourceId: orgId ?? "anonymous",
+  });
 
-  // Persist user message and assistant response
-  await persistMessages(conversationId, query, result.answer, {
-    latencyMs: result.metadata.latencyMs,
-    model: result.metadata.model,
-    retrievedChunks: result.retrievedChunks.map((c) => c.id),
+  const sources = extractSources(result.steps ?? []);
+
+  await persistMessages(conversationId, query, result.text, {
+    model: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+    retrievedChunks: sources.map((s) => s.id),
   });
 
   return c.json({
     conversationId,
-    answer: result.answer,
-    sources: result.retrievedChunks.map((chunk) => ({
-      id: chunk.id,
-      documentTitle: chunk.documentTitle,
-      documentSource: chunk.documentSource,
-      score: chunk.score,
-      excerpt: chunk.content.slice(0, 200) + (chunk.content.length > 200 ? "…" : ""),
-    })),
-    metadata: result.metadata,
+    answer: result.text,
+    sources,
+    metadata: {
+      model: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+      chunksRetrieved: sources.length,
+    },
   });
 });
 
 /**
  * GET /chat/stream?query=...&conversationId=...
- * Stream the response as Server-Sent Events (SSE).
+ * SSE streaming. Emits: sources → text chunks → done
  *
  * Event types:
- *   { type: "sources", chunks: [...] }   — retrieved context (first)
- *   { type: "text", text: "..." }         — streamed answer tokens
- *   { type: "done" }                      — stream complete
- *   { type: "error", message: "..." }     — error occurred
+ *   { type: "sources", chunks: [...] }
+ *   { type: "text", text: "..." }
+ *   { type: "done" }
+ *   { type: "error", message: "..." }
  */
 chat.get("/stream", async (c) => {
   const queryParam = c.req.query("query");
@@ -85,7 +82,6 @@ chat.get("/stream", async (c) => {
     return c.json({ error: parsed.error.message }, 400);
   }
 
-  const { query } = parsed.data;
   const conversationId = await resolveConversationId(parsed.data.conversationId);
 
   c.header("Content-Type", "text/event-stream");
@@ -93,40 +89,62 @@ chat.get("/stream", async (c) => {
   c.header("Connection", "keep-alive");
   c.header("X-Conversation-Id", conversationId);
 
-  return stream(c, async (stream) => {
+  return stream(c, async (streamWriter) => {
     let fullAnswer = "";
-    let sources: Array<{ id: string; title: string; score: number }> = [];
+    let sourcesEmitted = false;
+    const collectedSources: Array<{ id: string; title: string; score: number }> = [];
 
     try {
-      for await (const event of runRagPipelineStream({
-        query,
-        conversationId,
-        orgId: parsed.data.orgId,
-        documentIds: parsed.data.documentIds,
-      })) {
-        await stream.write(event);
+      const agentStream = await ragAgent.stream(parsed.data.query, {
+        threadId: conversationId,
+        resourceId: orgId ?? "anonymous",
+      });
 
-        // Parse events to capture full answer for persistence
-        try {
-          const raw = event.replace(/^data: /, "").trim();
-          const parsed = JSON.parse(raw) as { type: string; text?: string; chunks?: typeof sources };
-          if (parsed.type === "text" && parsed.text) fullAnswer += parsed.text;
-          if (parsed.type === "sources" && parsed.chunks) sources = parsed.chunks;
-        } catch {
-          // ignore parse errors
+      for await (const chunk of agentStream.fullStream) {
+        // Mastra 1.5 wraps all event data in payload
+        const payload = (chunk as { payload?: Record<string, unknown> }).payload ?? {};
+
+        if (chunk.type === "tool-result") {
+          const toolName = payload["toolName"] as string | undefined;
+          if (toolName === "searchDocuments" && !sourcesEmitted) {
+            const res = payload["result"] as {
+              chunks?: Array<{ id: string; documentTitle: string; score: number }>;
+            } | undefined;
+            const chunks = res?.chunks ?? [];
+            collectedSources.push(
+              ...chunks.map((ch) => ({ id: ch.id, title: ch.documentTitle, score: ch.score }))
+            );
+            await streamWriter.write(
+              `data: ${JSON.stringify({ type: "sources", chunks: collectedSources })}\n\n`
+            );
+            sourcesEmitted = true;
+          }
+        } else if (chunk.type === "text-delta") {
+          const text = (payload["text"] as string | undefined) ?? "";
+          if (text) {
+            fullAnswer += text;
+            await streamWriter.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+          }
         }
       }
 
-      // Persist after stream completes
+      if (!sourcesEmitted) {
+        await streamWriter.write(
+          `data: ${JSON.stringify({ type: "sources", chunks: [] })}\n\n`
+        );
+      }
+
       if (fullAnswer) {
-        await persistMessages(conversationId, query, fullAnswer, {
-          model: process.env["NODE_ENV"] === "production" ? "claude-3-5-sonnet" : "ollama",
-          retrievedChunks: sources.map((s) => s.id),
+        await persistMessages(conversationId, parsed.data.query, fullAnswer, {
+          model: process.env["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+          retrievedChunks: collectedSources.map((s) => s.id),
         });
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Internal error";
-      await stream.write(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`);
+      await streamWriter.write(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`);
+    } finally {
+      await streamWriter.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
     }
   });
 });
@@ -137,7 +155,6 @@ chat.get("/stream", async (c) => {
 
 async function resolveConversationId(id?: string): Promise<string> {
   if (id) {
-    // Verify conversation exists
     const conv = await db.query.conversations.findFirst({
       where: eq(conversations.id, id),
       columns: { id: true },
@@ -145,7 +162,6 @@ async function resolveConversationId(id?: string): Promise<string> {
     if (conv) return id;
   }
 
-  // Create new conversation
   const [conv] = await db
     .insert(conversations)
     .values({ title: "New conversation" })
@@ -154,31 +170,48 @@ async function resolveConversationId(id?: string): Promise<string> {
   return conv!.id;
 }
 
+function extractSources(
+  steps: Array<{ toolResults?: Array<unknown> }>
+) {
+  const allToolResults = steps.flatMap((s) => s.toolResults ?? []);
+
+  // Mastra 1.5 wraps tool results in a payload object
+  const searchResult = allToolResults.find((r) => {
+    const payload = (r as { payload?: { toolName?: string } }).payload;
+    return payload?.toolName === "searchDocuments";
+  });
+  if (!searchResult) return [];
+
+  const res = (searchResult as { payload: { result?: unknown } }).payload.result as {
+    chunks?: Array<{
+      id: string;
+      documentTitle: string;
+      documentSource: string;
+      score: number;
+      content: string;
+    }>;
+  } | undefined;
+
+  return (res?.chunks ?? []).map((c) => ({
+    id: c.id,
+    documentTitle: c.documentTitle,
+    documentSource: c.documentSource,
+    score: c.score,
+    excerpt: c.content.slice(0, 200) + (c.content.length > 200 ? "…" : ""),
+  }));
+}
+
 async function persistMessages(
   conversationId: string,
   userMessage: string,
   assistantMessage: string,
-  metadata: {
-    latencyMs?: number;
-    model?: string;
-    retrievedChunks?: string[];
-  }
+  metadata: { model?: string; retrievedChunks?: string[] }
 ): Promise<void> {
   await db.insert(messages).values([
-    {
-      conversationId,
-      role: "user",
-      content: userMessage,
-    },
-    {
-      conversationId,
-      role: "assistant",
-      content: assistantMessage,
-      metadata,
-    },
+    { conversationId, role: "user", content: userMessage },
+    { conversationId, role: "assistant", content: assistantMessage, metadata },
   ]);
 
-  // Update conversation's updatedAt
   await db
     .update(conversations)
     .set({ updatedAt: new Date() })

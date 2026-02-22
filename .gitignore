@@ -27,6 +27,9 @@ Thumbs.db
 # Drizzle
 drizzle/
 
+# Frontend local env
+frontend/.env
+
 # Logs
 *.log
 logs/

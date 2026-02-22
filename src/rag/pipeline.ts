@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ragConfig } from "../config/rag.config.js";
 import { retrieve, retrieveMultiQuery } from "./retriever.js";
 import { rerank } from "./reranker.js";
@@ -25,24 +26,48 @@ function getOpenAIClient(): OpenAI {
   return new OpenAI({ apiKey });
 }
 
+function getGoogleClient(): GoogleGenerativeAI {
+  const apiKey = process.env["GOOGLE_API_KEY"];
+  if (!apiKey) throw new Error("GOOGLE_API_KEY is required for Gemini");
+  return new GoogleGenerativeAI(apiKey);
+}
+
+// Resolves which provider to use based on available API keys and env
+function resolveProvider(): "gemini" | "anthropic" | "ollama" {
+  if (process.env["GOOGLE_API_KEY"]) return "gemini";
+  if (process.env["NODE_ENV"] === "production") return "anthropic";
+  return "ollama";
+}
+
 // ============================================================
 // Embeddings
 // ============================================================
 
 export async function createEmbedding(text: string): Promise<number[]> {
-  const isLocal = process.env["NODE_ENV"] !== "production";
+  const provider = resolveProvider();
 
-  if (isLocal && process.env["OLLAMA_BASE_URL"]) {
-    return createOllamaEmbedding(text);
-  }
+  if (provider === "gemini") return createGeminiEmbedding(text);
+  if (provider === "ollama") return createOllamaEmbedding(text);
 
+  // anthropic doesn't have embeddings — use OpenAI
   const openai = getOpenAIClient();
   const response = await openai.embeddings.create({
     model: ragConfig.embeddingModel,
     input: text,
   });
-
   return response.data[0]!.embedding;
+}
+
+async function createGeminiEmbedding(text: string): Promise<number[]> {
+  const google = getGoogleClient();
+  const model = google.getGenerativeModel({ model: "gemini-embedding-001" });
+  // outputDimensionality: 768 matches the current DB schema (same as nomic-embed-text)
+  const result = await model.embedContent({
+    content: { parts: [{ text }], role: "user" },
+    taskType: "RETRIEVAL_QUERY",
+    outputDimensionality: 768,
+  } as Parameters<typeof model.embedContent>[0]);
+  return result.embedding.values;
 }
 
 async function createOllamaEmbedding(text: string): Promise<number[]> {
@@ -69,18 +94,21 @@ async function createOllamaEmbedding(text: string): Promise<number[]> {
 
 const llmClient = {
   complete: async (prompt: string): Promise<string> => {
-    const isLocal = process.env["NODE_ENV"] !== "production";
+    const provider = resolveProvider();
 
-    if (isLocal && process.env["OLLAMA_BASE_URL"]) {
+    if (provider === "gemini") {
+      const google = getGoogleClient();
+      const model = google.getGenerativeModel({ model: resolveGeminiModel() });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    }
+
+    if (provider === "ollama") {
       const baseUrl = process.env["OLLAMA_BASE_URL"] ?? "http://localhost:11434";
       const response = await fetch(`${baseUrl}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: ragConfig.llmModel,
-          prompt,
-          stream: false,
-        }),
+        body: JSON.stringify({ model: ragConfig.llmModel, prompt, stream: false }),
       });
       const data = (await response.json()) as { response: string };
       return data.response;
@@ -96,6 +124,10 @@ const llmClient = {
     return content?.type === "text" ? content.text : "";
   },
 };
+
+function resolveGeminiModel(): string {
+  return process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash";
+}
 
 // ============================================================
 // Context building
@@ -246,25 +278,41 @@ async function generateAnswer(
   history: Array<{ role: "user" | "assistant"; content: string }>,
   query: string
 ): Promise<string> {
-  const isLocal = process.env["NODE_ENV"] !== "production";
-
-  if (isLocal && process.env["OLLAMA_BASE_URL"]) {
-    return generateWithOllama(systemPrompt, history, query);
-  }
+  const provider = resolveProvider();
+  if (provider === "gemini") return generateWithGemini(systemPrompt, history, query);
+  if (provider === "ollama") return generateWithOllama(systemPrompt, history, query);
 
   const anthropic = getAnthropicClient();
   const response = await anthropic.messages.create({
     model: ragConfig.llmModel,
     max_tokens: 2048,
     system: systemPrompt,
-    messages: [
-      ...history,
-      { role: "user", content: query },
-    ],
+    messages: [...history, { role: "user", content: query }],
   });
-
   const content = response.content[0];
   return content?.type === "text" ? content.text : "";
+}
+
+async function generateWithGemini(
+  systemPrompt: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  query: string
+): Promise<string> {
+  const google = getGoogleClient();
+  const model = google.getGenerativeModel({
+    model: resolveGeminiModel(),
+    systemInstruction: systemPrompt,
+  });
+
+  const chat = model.startChat({
+    history: history.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+  });
+
+  const result = await chat.sendMessage(query);
+  return result.response.text();
 }
 
 async function generateWithOllama(
@@ -345,15 +393,43 @@ export async function* runRagPipelineStream(
   yield `data: ${JSON.stringify({ type: "sources", chunks: retrievedChunks.map((c) => ({ id: c.id, title: c.documentTitle, score: c.score })) })}\n\n`;
 
   // Stream the answer
-  const isLocal = process.env["NODE_ENV"] !== "production";
-
-  if (isLocal && process.env["OLLAMA_BASE_URL"]) {
+  const provider = resolveProvider();
+  if (provider === "gemini") {
+    yield* streamWithGemini(systemPrompt, history, query);
+  } else if (provider === "ollama") {
     yield* streamWithOllama(systemPrompt, history, query);
   } else {
     yield* streamWithAnthropic(systemPrompt, history, query);
   }
 
   yield `data: ${JSON.stringify({ type: "done" })}\n\n`;
+}
+
+async function* streamWithGemini(
+  systemPrompt: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  query: string
+): AsyncGenerator<string> {
+  const google = getGoogleClient();
+  const model = google.getGenerativeModel({
+    model: resolveGeminiModel(),
+    systemInstruction: systemPrompt,
+  });
+
+  const chat = model.startChat({
+    history: history.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+  });
+
+  const result = await chat.sendMessageStream(query);
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) {
+      yield `data: ${JSON.stringify({ type: "text", text })}\n\n`;
+    }
+  }
 }
 
 async function* streamWithAnthropic(

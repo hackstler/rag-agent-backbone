@@ -3,7 +3,7 @@ import { documents, documentChunks } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { ragConfig } from "../config/rag.config.js";
 import { chunk } from "../rag/chunker.js";
-import { createEmbedding } from "../rag/pipeline.js";
+import { createEmbedding } from "../rag/embeddings.js";
 import type { LoadedDocument } from "./loader.js";
 import type { NewDocument, NewDocumentChunk } from "../db/schema.js";
 
