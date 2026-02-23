@@ -42,3 +42,15 @@ export interface IRetriever {
 export interface IReranker {
   rerank(query: string, chunks: RetrievedChunk[], options: RerankerOptions): Promise<RetrievedChunk[]>;
 }
+
+export interface RetrievalPipelineOptions {
+  topK?: number;
+  orgId?: string;
+  documentIds?: string[];
+}
+
+export interface RetrievalPipelineResult {
+  chunks: RetrievedChunk[];
+  chunkCount: number;
+  expanded: boolean;
+}
