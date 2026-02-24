@@ -34,7 +34,9 @@ health.get("/rag-debug", async (c) => {
 
   // 1. DB summary
   const docsResult = await db.execute(sql`
-    SELECT d.org_id, d.status, COUNT(d.id) as doc_count, COUNT(dc.id) as chunk_count
+    SELECT d.org_id, d.status,
+      COUNT(DISTINCT d.id) as doc_count,
+      COUNT(dc.id) as chunk_count
     FROM documents d
     LEFT JOIN document_chunks dc ON dc.document_id = d.id
     GROUP BY d.org_id, d.status
