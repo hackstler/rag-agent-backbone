@@ -51,11 +51,11 @@ export interface RagConfig {
   tracingProvider: "none" | "langfuse" | "langsmith";
 }
 
-// Default config — overridden by initial-setup.md answers
+// Default config — overridden by /setup wizard answers or env vars
 const defaultConfig: RagConfig = {
-  agentName: "Emilio",
-  agentDescription: "Un asistente personal inteligente que recuerda todo lo que le compartes — vídeos, notas, ideas, enlaces — y te ayuda a recuperar esa información cuando la necesitas.",
-  responseLanguage: "es",
+  agentName: process.env["AGENT_NAME"] ?? "Emilio",
+  agentDescription: process.env["AGENT_DESCRIPTION"] ?? "Un asistente personal inteligente que recuerda todo lo que le compartes — vídeos, notas, ideas, enlaces — y te ayuda a recuperar esa información cuando la necesitas.",
+  responseLanguage: process.env["AGENT_LANGUAGE"] ?? "es",
   useCase: "custom",
 
   topK: Number(process.env["RAG_TOP_K"] ?? 10),
