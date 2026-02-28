@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS "whatsapp_sessions" (
 
 DO $$ BEGIN
   ALTER TABLE "whatsapp_sessions" ADD CONSTRAINT "whatsapp_sessions_org_id_unique" UNIQUE("org_id");
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_table OR duplicate_object THEN NULL;
 END $$;
