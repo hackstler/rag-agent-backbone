@@ -33,9 +33,10 @@ app.use(
 
 // Routes
 app.route("/health", health);                          // public — no auth
-app.route("/auth", authRouter);                        // public — register/login/me
 
 const auth = authMiddleware();
+app.use("/auth/me", auth);                             // /auth/me needs JWT
+app.route("/auth", authRouter);                        // register/login are public
 app.use("/ingest/*", auth);
 app.use("/chat/*", auth);
 app.use("/conversations/*", auth);

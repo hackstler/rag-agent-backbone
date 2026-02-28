@@ -1,8 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Pool } from "pg";
-import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
+import { resolve } from "path";
 import * as schema from "./schema.js";
 
 const DATABASE_URL = process.env["DATABASE_URL"];
@@ -40,7 +39,7 @@ export async function ensurePgVector(): Promise<void> {
 }
 
 export async function runMigrations(): Promise<void> {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const migrationsFolder = resolve(__dirname, "migrations");
+  const base = process.env["NODE_ENV"] === "production" ? "dist" : "src";
+  const migrationsFolder = resolve(base, "db", "migrations");
   await migrate(db, { migrationsFolder });
 }
