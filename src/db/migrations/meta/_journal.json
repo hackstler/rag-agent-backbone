@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1708000000000,
+      "when": 1772300000000,
       "tag": "0000_initial",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1720000000000,
-      "tag": "0001_add_youtube_content_type",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1740000000000,
-      "tag": "0002_add_topics",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1772200000000,
-      "tag": "0003_add_whatsapp_sessions",
       "breakpoints": true
     }
   ]
