@@ -1,7 +1,7 @@
-import { db } from "../db/client.js";
-import { documentChunks, documents } from "../db/schema.js";
+import { db } from "../../../infrastructure/db/client.js";
+import { documentChunks, documents } from "../../../infrastructure/db/schema.js";
 import { sql, eq } from "drizzle-orm";
-import type { DocumentChunk } from "../db/schema.js";
+import type { DocumentChunk } from "../../../infrastructure/db/schema.js";
 import type { RetrievedChunk, RetrieverOptions } from "./interfaces.js";
 
 export type { RetrievedChunk, RetrieverOptions };

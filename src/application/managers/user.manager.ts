@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import type { User } from "../../db/schema.js";
+import type { User } from "../../domain/entities/index.js";
 import type { UserRepository } from "../../domain/ports/repositories/user.repository.js";
 import {
   NotFoundError,

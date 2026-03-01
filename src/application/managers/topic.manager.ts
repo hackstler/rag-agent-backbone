@@ -1,4 +1,4 @@
-import type { Topic, Document } from "../../db/schema.js";
+import type { Topic, Document } from "../../domain/entities/index.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 import { NotFoundError, ConflictError } from "../../domain/errors/index.js";
 

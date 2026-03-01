@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ragConfig } from "../config/rag.config.js";
 import { transformQuery } from "./query-transformer.js";
-import type { ToolRegistryDeps } from "../agent/tools/base.js";
+import type { ToolRegistryDeps } from "../tools/base.js";
 import type { RetrievalPipelineOptions, RetrievalPipelineResult } from "./interfaces.js";
 
 export async function runRetrievalPipeline(

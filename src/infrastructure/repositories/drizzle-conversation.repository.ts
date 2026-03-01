@@ -1,7 +1,7 @@
 import { eq, desc, asc } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { conversations, messages } from "../../db/schema.js";
-import type { Conversation, NewConversation } from "../../db/schema.js";
+import { db } from "../db/client.js";
+import { conversations, messages } from "../db/schema.js";
+import type { Conversation, NewConversation } from "../db/schema.js";
 import type {
   ConversationRepository,
   ConversationWithMessages,

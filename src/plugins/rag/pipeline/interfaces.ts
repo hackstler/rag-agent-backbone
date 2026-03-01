@@ -1,4 +1,4 @@
-import type { DocumentChunk } from "../db/schema.js";
+import type { DocumentChunk } from "../../../domain/entities/index.js";
 
 // ============================================================
 // Shared domain types

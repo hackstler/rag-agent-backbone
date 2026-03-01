@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { Chunk } from "../rag/chunker.js";
+import type { Chunk } from "../pipeline/chunker.js";
 
 export interface ContextualizedChunk extends Chunk {
   contextPrefix: string;

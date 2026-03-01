@@ -1,4 +1,4 @@
-import type { User, NewUser } from "../../../db/schema.js";
+import type { User, NewUser } from "../../entities/index.js";
 
 export interface OrgUserCount {
   orgId: string | null;

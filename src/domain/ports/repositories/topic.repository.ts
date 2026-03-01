@@ -1,4 +1,4 @@
-import type { Topic, NewTopic, Document } from "../../../db/schema.js";
+import type { Topic, NewTopic, Document } from "../../entities/index.js";
 
 export interface TopicRepository {
   findById(id: string): Promise<Topic | null>;

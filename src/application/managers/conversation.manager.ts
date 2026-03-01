@@ -1,4 +1,4 @@
-import type { Conversation } from "../../db/schema.js";
+import type { Conversation } from "../../domain/entities/index.js";
 import type {
   ConversationRepository,
   ConversationWithMessages,

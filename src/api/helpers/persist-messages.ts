@@ -1,5 +1,5 @@
-import { db } from "../../db/client.js";
-import { messages, conversations } from "../../db/schema.js";
+import { db } from "../../infrastructure/db/client.js";
+import { messages, conversations } from "../../infrastructure/db/schema.js";
 import { eq } from "drizzle-orm";
 
 export async function persistMessages(

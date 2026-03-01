@@ -1,4 +1,4 @@
-import type { Document, NewDocument } from "../../../db/schema.js";
+import type { Document, NewDocument } from "../../entities/index.js";
 
 export interface ListDocumentsFilters {
   contentType?: string;

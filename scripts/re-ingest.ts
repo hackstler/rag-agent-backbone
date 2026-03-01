@@ -7,8 +7,8 @@
  *   npx tsx scripts/re-ingest.ts --org hackstler --dry-run
  */
 import "dotenv/config";
-import { db } from "../src/db/client.js";
-import { documents } from "../src/db/schema.js";
+import { db } from "../src/infrastructure/db/client.js";
+import { documents } from "../src/infrastructure/db/schema.js";
 import { eq, and } from "drizzle-orm";
 import { loadDocument } from "../src/ingestion/loader.js";
 import { processDocument } from "../src/ingestion/processor.js";

@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
-import { ensurePgVector, runMigrations } from "./db/client.js";
+import { ensurePgVector, runMigrations } from "./infrastructure/db/client.js";
 import { authMiddleware, optionalAuth, requireRole, requireWorker } from "./api/middleware/auth.js";
 import { errorHandler, domainErrorToHttpStatus } from "./api/middleware/error-handler.middleware.js";
 import { DomainError } from "./domain/errors/index.js";
@@ -33,13 +33,12 @@ import { createInternalController } from "./api/controllers/internal.controller.
 import { createAdminController } from "./api/controllers/admin.controller.js";
 import { createTopicController } from "./api/controllers/topic.controller.js";
 
-// Agent (for internal controller injection)
-import { ragAgent } from "./agent/index.js";
+// Plugins
+import { PluginRegistry } from "./plugins/plugin-registry.js";
+import { RagPlugin } from "./plugins/rag/index.js";
 
-// API — routes NOT yet refactored (RAG pipeline, ingestion, health)
+// API — health (standalone, not plugin-specific)
 import health from "./api/health.js";
-import ingest from "./api/ingest.js";
-import chat from "./api/chat.js";
 
 const app = new Hono();
 
@@ -55,6 +54,12 @@ app.use(
   })
 );
 app.use("*", errorHandler());
+
+// ── Plugin registry ───────────────────────────────────────────────────────────
+
+const pluginRegistry = new PluginRegistry();
+const ragPlugin = new RagPlugin();
+pluginRegistry.register(ragPlugin);
 
 // ── Composition root ───────────────────────────────────────────────────────────
 
@@ -91,8 +96,9 @@ app.use("/conversations/*", auth);
 app.use("/topics/*", auth);
 app.use("/documents/*", auth);
 
-app.route("/ingest", ingest);                              // not yet refactored
-app.route("/chat", chat);                                  // not yet refactored
+// Plugin routes (chat, ingest) — mounted at same paths as before
+pluginRegistry.mountRoutes(app);
+
 app.route("/conversations", createConversationController(convManager));
 app.route("/topics", createTopicController(topicManager));
 app.route("/documents", createDocumentController(docManager));
@@ -109,18 +115,19 @@ app.route("/admin", createAdminController(userManager, orgManager));
 // Internal worker endpoints — worker JWT auth
 const workerAuth = requireWorker();
 app.use("/internal/*", workerAuth);
-app.route("/internal", createInternalController(waManager, convManager, ragAgent));
+app.route("/internal", createInternalController(waManager, convManager, ragPlugin.agent));
 
 // ── 404 + error fallback ───────────────────────────────────────────────────────
-app.notFound((c) => c.json({ error: "Not found" }, 404));
+app.notFound((c) => c.json({ error: "NotFound", message: "Not found" }, 404));
 
 app.onError((err, c) => {
   if (err instanceof DomainError) {
     const status = domainErrorToHttpStatus(err) as 400 | 401 | 403 | 404 | 409;
-    return c.json({ error: err.message }, status);
+    const category = err.constructor.name.replace(/Error$/, "");
+    return c.json({ error: category, message: err.message }, status);
   }
   console.error("[error]", err);
-  return c.json({ error: "Internal server error", message: err.message }, 500);
+  return c.json({ error: "InternalError", message: err.message }, 500);
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────
@@ -144,6 +151,8 @@ async function main() {
   console.log("[startup] migrations applied");
 
   await seedAdminUser();
+
+  await pluginRegistry.initializeAll();
 
   serve({ fetch: app.fetch, port: PORT }, () => {
     console.log(`[startup] rag-agent-backbone running on http://localhost:${PORT}`);

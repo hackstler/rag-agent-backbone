@@ -6,7 +6,7 @@ import type { ConversationManager } from "../../application/managers/conversatio
 import { extractSources } from "../helpers/extract-sources.js";
 import { persistMessages } from "../helpers/persist-messages.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
-import { ragConfig } from "../../config/rag.config.js";
+import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 
 const qrSchema = z.object({
   qrData: z.string().min(1),

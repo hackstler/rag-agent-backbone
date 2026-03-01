@@ -1,13 +1,13 @@
-import { db } from "../db/client.js";
-import { documents, documentChunks } from "../db/schema.js";
+import { db } from "../../../infrastructure/db/client.js";
+import { documents, documentChunks } from "../../../infrastructure/db/schema.js";
 import { eq, sql } from "drizzle-orm";
 import { ragConfig } from "../config/rag.config.js";
-import { chunk, type ChunkerOptions } from "../rag/chunker.js";
-import { createEmbedding } from "../rag/embeddings.js";
+import { chunk, type ChunkerOptions } from "../pipeline/chunker.js";
+import { createEmbedding } from "../pipeline/embeddings.js";
 import { enrichDocument, resolveTopic } from "./enricher.js";
 import { contextualizeChunks } from "./contextualizer.js";
 import type { LoadedDocument } from "./loader.js";
-import type { NewDocument, NewDocumentChunk } from "../db/schema.js";
+import type { NewDocument, NewDocumentChunk } from "../../../infrastructure/db/schema.js";
 
 export interface ProcessResult {
   documentId: string;

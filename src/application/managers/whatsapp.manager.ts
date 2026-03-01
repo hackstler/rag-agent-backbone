@@ -1,4 +1,4 @@
-import type { WhatsappSession } from "../../db/schema.js";
+import type { WhatsappSession } from "../../domain/entities/index.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
 import type { UserRepository } from "../../domain/ports/repositories/user.repository.js";
 import { NotFoundError, ConflictError } from "../../domain/errors/index.js";

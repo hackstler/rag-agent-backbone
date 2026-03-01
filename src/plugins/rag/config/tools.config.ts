@@ -5,8 +5,8 @@
  * enabled: false → tool is excluded at startup, zero overhead
  *
  * To add a new tool:
- * 1. Create src/agent/tools/my-tool.ts (export myToolEntry)
- * 2. Add it to ALL_TOOLS in src/agent/tools/index.ts
+ * 1. Create src/plugins/rag/tools/my-tool.ts (export myToolEntry)
+ * 2. Add it to ALL_TOOLS in src/plugins/rag/tools/index.ts
  * 3. Add the key here
  */
 export const toolsConfig = {

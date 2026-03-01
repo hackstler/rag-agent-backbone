@@ -1,7 +1,7 @@
 import { eq, and, ilike, desc, count, type SQL } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { documents } from "../../db/schema.js";
-import type { Document, NewDocument } from "../../db/schema.js";
+import { db } from "../db/client.js";
+import { documents } from "../db/schema.js";
+import type { Document, NewDocument } from "../db/schema.js";
 import type { DocumentRepository, ListDocumentsFilters, OrgDocCount } from "../../domain/ports/repositories/document.repository.js";
 
 export class DrizzleDocumentRepository implements DocumentRepository {

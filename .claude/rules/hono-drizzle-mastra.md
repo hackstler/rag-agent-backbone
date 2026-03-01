@@ -48,8 +48,8 @@ return stream(c, async (writer) => {
 // Success
 return c.json({ data: result })
 
-// Error
-return c.json({ error: "message" }, 400)
+// Error — always { error: "Category", message: "detail" }
+return c.json({ error: "Validation", message: "Invalid input" }, 400)
 ```
 
 ---
@@ -89,8 +89,12 @@ export const tableRelations = relations(table, ({ one, many }) => ({
 
 ### Type inference
 ```typescript
+// Infrastructure types (in src/infrastructure/db/schema.ts)
 export type Session = typeof whatsappSessions.$inferSelect
 export type NewSession = typeof whatsappSessions.$inferInsert
+
+// Domain entities (in src/domain/entities/index.ts) — pure interfaces
+// Domain/Application layers import from domain entities, NOT schema
 ```
 
 ### Pool singleton

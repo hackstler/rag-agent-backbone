@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { topics, documents } from "../../db/schema.js";
-import type { Topic, NewTopic, Document } from "../../db/schema.js";
+import { db } from "../db/client.js";
+import { topics, documents } from "../db/schema.js";
+import type { Topic, NewTopic, Document } from "../db/schema.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 
 export class DrizzleTopicRepository implements TopicRepository {

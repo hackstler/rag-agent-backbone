@@ -1,4 +1,4 @@
-import type { Conversation, NewConversation, Message } from "../../../db/schema.js";
+import type { Conversation, NewConversation, Message } from "../../entities/index.js";
 
 export interface ConversationWithMessages extends Conversation {
   messages: Pick<Message, "id" | "role" | "content" | "metadata" | "createdAt">[];

@@ -1,7 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import type { ToolEntry } from "./base.js";
-import type { LoadedDocument } from "../../ingestion/loader.js";
+import type { LoadedDocument } from "../ingestion/loader.js";
 
 /**
  * Ingest one or multiple URLs / notes into the knowledge base.
@@ -47,8 +47,8 @@ For a list of URLs, pass ALL of them in the 'items' array in a single call — d
       })),
     }),
     execute: async ({ items, orgId }) => {
-      const { loadDocument } = await import("../../ingestion/loader.js");
-      const { processDocument } = await import("../../ingestion/processor.js");
+      const { loadDocument } = await import("../ingestion/loader.js");
+      const { processDocument } = await import("../ingestion/processor.js");
 
       const results = await Promise.all(
         items.map(async (item) => {

@@ -1,7 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { ragConfig } from "../../config/rag.config.js";
-import { runRetrievalPipeline } from "../../rag/retrieval-pipeline.js";
+import { ragConfig } from "../config/rag.config.js";
+import { runRetrievalPipeline } from "../pipeline/retrieval-pipeline.js";
 import type { ToolEntry, ToolRegistryDeps } from "./base.js";
 
 const chunkSchema = z.object({

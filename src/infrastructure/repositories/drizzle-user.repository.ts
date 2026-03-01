@@ -1,7 +1,7 @@
 import { eq, ilike, and, count, min, type SQL } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { users } from "../../db/schema.js";
-import type { User, NewUser } from "../../db/schema.js";
+import { db } from "../db/client.js";
+import { users } from "../db/schema.js";
+import type { User, NewUser } from "../db/schema.js";
 import type { UserRepository, OrgUserCount } from "../../domain/ports/repositories/user.repository.js";
 
 export class DrizzleUserRepository implements UserRepository {

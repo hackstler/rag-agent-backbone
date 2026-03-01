@@ -1,7 +1,7 @@
 import { eq, ne } from "drizzle-orm";
-import { db } from "../../db/client.js";
-import { whatsappSessions } from "../../db/schema.js";
-import type { WhatsappSession, NewWhatsappSession } from "../../db/schema.js";
+import { db } from "../db/client.js";
+import { whatsappSessions } from "../db/schema.js";
+import type { WhatsappSession, NewWhatsappSession } from "../db/schema.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
 
 export class DrizzleWhatsAppSessionRepository implements WhatsAppSessionRepository {

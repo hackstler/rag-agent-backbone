@@ -2,7 +2,7 @@
 
 ## Tabla `whatsappSessions`
 
-Schema con Drizzle en `src/db/schema.ts`:
+Schema con Drizzle en `src/infrastructure/db/schema.ts`:
 
 ```typescript
 export const whatsappSessions = pgTable('whatsapp_sessions', {

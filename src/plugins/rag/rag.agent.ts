@@ -2,8 +2,8 @@ import { Agent } from "@mastra/core/agent";
 import { Memory } from "@mastra/memory";
 import { PostgresStore } from "@mastra/pg";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { ragConfig } from "../config/rag.config.js";
-import { defaultEmbedder, pgvectorRetriever, defaultReranker } from "../rag/adapters.js";
+import { ragConfig } from "./config/rag.config.js";
+import { defaultEmbedder, pgvectorRetriever, defaultReranker } from "./pipeline/adapters.js";
 import { createToolRegistry } from "./tools/index.js";
 
 const google = createGoogleGenerativeAI({
@@ -90,3 +90,5 @@ ${ragConfig.responseLanguage !== "en" ? `10. Always respond in ${ragConfig.respo
 
   memory,
 });
+
+export { tools as ragTools };

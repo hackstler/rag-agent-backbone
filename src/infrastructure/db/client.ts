@@ -41,8 +41,8 @@ export async function ensurePgVector(): Promise<void> {
 export async function runMigrations(): Promise<void> {
   const { existsSync } = await import("fs");
   const candidates = [
-    resolve(process.cwd(), "dist", "db", "migrations"),
-    resolve(process.cwd(), "src", "db", "migrations"),
+    resolve(process.cwd(), "dist", "infrastructure", "db", "migrations"),
+    resolve(process.cwd(), "src", "infrastructure", "db", "migrations"),
   ];
   const migrationsFolder = candidates.find((p) => existsSync(resolve(p, "meta", "_journal.json")));
   if (!migrationsFolder) {

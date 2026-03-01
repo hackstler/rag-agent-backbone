@@ -7,9 +7,9 @@
  */
 import { createWorkflow, createStep } from "@mastra/core/workflows";
 import { z } from "zod";
-import { ragConfig } from "../config/rag.config.js";
-import { runRetrievalPipeline } from "../rag/retrieval-pipeline.js";
-import { defaultEmbedder, pgvectorRetriever, defaultReranker } from "../rag/adapters.js";
+import { ragConfig } from "./config/rag.config.js";
+import { runRetrievalPipeline } from "./pipeline/retrieval-pipeline.js";
+import { defaultEmbedder, pgvectorRetriever, defaultReranker } from "./pipeline/adapters.js";
 import type { ToolRegistryDeps } from "./tools/index.js";
 
 const chunkSchema = z.object({

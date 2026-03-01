@@ -1,17 +1,15 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { loadDocument } from "../ingestion/loader.js";
 import { processDocument } from "../ingestion/processor.js";
-import { db } from "../db/client.js";
-import { documents } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { db } from "../../../infrastructure/db/client.js";
+import { documents } from "../../../infrastructure/db/schema.js";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
-
-const ingest = new Hono();
 
 const ingestUrlSchema = z.object({
   url: z.string().url(),
@@ -20,28 +18,61 @@ const ingestUrlSchema = z.object({
 });
 
 /**
- * POST /ingest
- * Ingest a document from file upload (multipart) or URL (JSON body).
- *
- * File upload: multipart/form-data with 'file' field + optional 'orgId'
- * URL ingest: application/json { url, orgId?, title? }
+ * Factory: creates ingest routes.
  */
-ingest.post("/", async (c) => {
-  const contentType = c.req.header("content-type") ?? "";
+export function createIngestRoutes(): Hono {
+  const ingest = new Hono();
 
-  if (contentType.includes("multipart/form-data")) {
-    return handleFileUpload(c);
-  }
+  /**
+   * POST /ingest
+   * Ingest a document from file upload (multipart) or URL (JSON body).
+   */
+  ingest.post("/", async (c) => {
+    const contentType = c.req.header("content-type") ?? "";
 
-  if (contentType.includes("application/json")) {
-    return handleUrlIngest(c);
-  }
+    if (contentType.includes("multipart/form-data")) {
+      return handleFileUpload(c);
+    }
 
-  return c.json(
-    { error: "Content-Type must be multipart/form-data or application/json" },
-    400
-  );
-});
+    if (contentType.includes("application/json")) {
+      return handleUrlIngest(c);
+    }
+
+    return c.json(
+      { error: "Content-Type must be multipart/form-data or application/json" },
+      400
+    );
+  });
+
+  /**
+   * GET /ingest/status/:id
+   * Check the status of an ingestion job.
+   */
+  ingest.get("/status/:id", async (c) => {
+    const id = c.req.param("id");
+
+    const doc = await db.query.documents.findFirst({
+      where: eq(documents.id, id),
+      columns: {
+        id: true,
+        title: true,
+        status: true,
+        chunkCount: true,
+        indexedAt: true,
+        createdAt: true,
+        metadata: true,
+      },
+    });
+
+    if (!doc) {
+      return c.json({ error: "Document not found" }, 404);
+    }
+
+    return c.json(doc);
+  });
+
+  return ingest;
+}
 
 async function handleFileUpload(c: Context) {
   const body = await c.req.parseBody();
@@ -110,32 +141,3 @@ async function handleUrlIngest(c: Context) {
     error: result.error,
   }, result.status === "indexed" ? 200 : 500);
 }
-
-/**
- * GET /ingest/status/:id
- * Check the status of an ingestion job.
- */
-ingest.get("/status/:id", async (c) => {
-  const id = c.req.param("id");
-
-  const doc = await db.query.documents.findFirst({
-    where: eq(documents.id, id),
-    columns: {
-      id: true,
-      title: true,
-      status: true,
-      chunkCount: true,
-      indexedAt: true,
-      createdAt: true,
-      metadata: true,
-    },
-  });
-
-  if (!doc) {
-    return c.json({ error: "Document not found" }, 404);
-  }
-
-  return c.json(doc);
-});
-
-export default ingest;

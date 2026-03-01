@@ -1,4 +1,4 @@
-import type { Document } from "../../db/schema.js";
+import type { Document } from "../../domain/entities/index.js";
 import type { DocumentRepository, ListDocumentsFilters } from "../../domain/ports/repositories/document.repository.js";
 import { NotFoundError } from "../../domain/errors/index.js";
 

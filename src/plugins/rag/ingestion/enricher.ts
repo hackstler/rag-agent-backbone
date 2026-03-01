@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { db } from "../db/client.js";
-import { topics } from "../db/schema.js";
+import { db } from "../../../infrastructure/db/client.js";
+import { topics } from "../../../infrastructure/db/schema.js";
 import { eq, and, sql } from "drizzle-orm";
 
 export interface EnrichmentResult {

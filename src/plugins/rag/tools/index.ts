@@ -1,4 +1,4 @@
-import { toolsConfig } from "../../config/tools.config.js";
+import { toolsConfig } from "../config/tools.config.js";
 import { searchDocumentsEntry } from "./search-documents.js";
 import { searchWebEntry } from "./search-web.js";
 import { saveNoteEntry } from "./save-note.js";
@@ -8,9 +8,9 @@ export type { ToolRegistryDeps };
 
 /**
  * All available tools. To add a new tool:
- * 1. Create src/agent/tools/my-tool.ts  (export myToolEntry: ToolEntry)
+ * 1. Create src/plugins/rag/tools/my-tool.ts  (export myToolEntry: ToolEntry)
  * 2. Import and add it here              ← one line
- * 3. Enable it in src/config/tools.config.ts ← one line
+ * 3. Enable it in config/tools.config.ts ← one line
  */
 const ALL_TOOLS: ToolEntry[] = [
   searchDocumentsEntry,

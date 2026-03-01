@@ -1,4 +1,4 @@
-import type { WhatsappSession, NewWhatsappSession } from "../../../db/schema.js";
+import type { WhatsappSession, NewWhatsappSession } from "../../entities/index.js";
 
 export interface WhatsAppSessionRepository {
   findByUserId(userId: string): Promise<WhatsappSession | null>;
