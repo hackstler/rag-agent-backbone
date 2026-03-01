@@ -130,6 +130,8 @@ export const documents = pgTable(
     indexedAt: timestamp("indexed_at", { withTimezone: true }),
   },
   (table) => ({
+    orgIdx: index("documents_org_id_idx").on(table.orgId),
+    sourceIdx: index("documents_source_idx").on(table.source),
     topicIdx: index("documents_topic_id_idx").on(table.orgId, table.topicId),
   })
 );
