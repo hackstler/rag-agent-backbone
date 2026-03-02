@@ -26,7 +26,7 @@ import { QuotePlugin } from "./plugins/quote/index.js";
 import { createCoordinatorAgent } from "./agent/coordinator.js";
 
 // Catalog seed
-import { seedCatalog } from "./infrastructure/db/seed.js";
+import { seedCatalog } from "./infrastructure/db/catalog-seed.js";
 
 // App factory
 import { createApp } from "./app.js";
