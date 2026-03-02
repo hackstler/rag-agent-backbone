@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
-import { ensurePgVector, runMigrations } from "./infrastructure/db/client.js";
+import { ensurePgVector, runMigrations, ensureCatalogTables } from "./infrastructure/db/client.js";
 
 // Infrastructure — repositories
 import { DrizzleUserRepository } from "./infrastructure/repositories/drizzle-user.repository.js";
@@ -92,10 +92,19 @@ async function main() {
   await runMigrations();
   console.log("[startup] migrations applied");
 
+  await ensureCatalogTables();
+
   await seedAdminUser();
 
   const adminOrg = process.env["ADMIN_USERNAME"] ?? "default";
-  await seedCatalog(adminOrg);
+  try {
+    await seedCatalog(adminOrg);
+  } catch (err) {
+    console.error(
+      "[seed:catalog] Failed to seed catalog:",
+      err instanceof Error ? err.message : err
+    );
+  }
 
   await pluginRegistry.initializeAll();
 
