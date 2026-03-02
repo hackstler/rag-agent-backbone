@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
-import { ensurePgVector, runMigrations, ensureCatalogTables } from "./infrastructure/db/client.js";
+import { ensurePgVector, runMigrations } from "./infrastructure/db/client.js";
 
 // Infrastructure — repositories
 import { DrizzleUserRepository } from "./infrastructure/repositories/drizzle-user.repository.js";
@@ -89,10 +89,14 @@ async function main() {
   await ensurePgVector();
   console.log("[startup] pgvector extension ready");
 
-  await runMigrations();
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("[migrations] unexpected error (non-fatal):", err instanceof Error ? err.message : err);
+  }
   console.log("[startup] migrations applied");
 
-  await ensureCatalogTables();
+  await pluginRegistry.ensureTablesForAll();
 
   await seedAdminUser();
 

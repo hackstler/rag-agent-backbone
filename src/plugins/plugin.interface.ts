@@ -8,6 +8,11 @@ export interface Plugin {
   readonly agent: Agent;
   readonly tools: ToolsInput;
   routes?(): Hono;
+  /**
+   * Called once at startup before any seed/init logic.
+   * Use to create plugin-owned tables with CREATE TABLE IF NOT EXISTS.
+   */
+  ensureTables?(): Promise<void>;
   initialize?(): Promise<void>;
   shutdown?(): Promise<void>;
 }

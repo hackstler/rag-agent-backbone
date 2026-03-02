@@ -45,6 +45,15 @@ export class PluginRegistry {
     }
   }
 
+  async ensureTablesForAll(): Promise<void> {
+    for (const plugin of this.plugins.values()) {
+      if (plugin.ensureTables) {
+        await plugin.ensureTables();
+        console.log(`[plugins] tables ready: ${plugin.id}`);
+      }
+    }
+  }
+
   async initializeAll(): Promise<void> {
     for (const plugin of this.plugins.values()) {
       if (plugin.initialize) {
