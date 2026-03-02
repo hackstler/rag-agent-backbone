@@ -26,13 +26,13 @@ export class CatalogService {
     if (orgCatalog) return orgCatalog.id;
 
     // Fallback: any active catalog (single-tenant deployments)
-    const [any] = await db
+    const [fallbackCatalog] = await db
       .select({ id: catalogs.id })
       .from(catalogs)
       .where(eq(catalogs.isActive, true))
       .limit(1);
 
-    return any?.id ?? null;
+    return fallbackCatalog?.id ?? null;
   }
 
   /**
@@ -56,7 +56,7 @@ export class CatalogService {
           eq(catalogItems.catalogId, catalogId),
           isNumeric
             ? eq(catalogItems.code, parseInt(trimmed, 10))
-            : ilike(catalogItems.name, `%${trimmed}%`)
+            : ilike(catalogItems.name, `%${trimmed.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
         )
       )
       .limit(1);

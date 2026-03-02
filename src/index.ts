@@ -28,10 +28,17 @@ import { createCoordinatorAgent } from "./agent/coordinator.js";
 // Catalog seed
 import { seedCatalog } from "./infrastructure/db/catalog-seed.js";
 
+// Auth strategy
+import { authConfig } from "./config/auth.config.js";
+import { createAuthStrategy } from "./infrastructure/auth/strategy-factory.js";
+
 // App factory
 import { createApp } from "./app.js";
 
 // ── Composition root ───────────────────────────────────────────────────────────
+
+// Auth strategy (firebase or null for password)
+const authStrategy = createAuthStrategy(authConfig);
 
 // Password salt — same secret used for JWT signing (stable across restarts)
 const PASSWORD_SALT = process.env["JWT_SECRET"] ?? "default-salt";
@@ -70,6 +77,8 @@ const app = createApp({
   orgManager,
   coordinatorAgent,
   pluginRegistry,
+  authConfig,
+  authStrategy,
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────
@@ -119,16 +128,23 @@ async function main() {
 }
 
 async function seedAdminUser() {
-  const username = process.env["ADMIN_USERNAME"];
-  const password = process.env["ADMIN_PASSWORD"];
-
-  if (!username || !password || !process.env["JWT_SECRET"]) return;
+  if (!process.env["JWT_SECRET"]) return;
 
   const count = await userManager.countUsers();
   if (count > 0) return;
 
-  await userManager.create({ username, password, orgId: username, role: "admin" });
-  console.log(`[startup] Admin user '${username}' created`);
+  if (authConfig.strategy === "firebase") {
+    const email = process.env["ADMIN_EMAIL"];
+    if (!email) return;
+    await userManager.invite({ email, orgId: email, role: "admin" });
+    console.log(`[startup] Admin user '${email}' created (firebase strategy)`);
+  } else {
+    const username = process.env["ADMIN_USERNAME"];
+    const password = process.env["ADMIN_PASSWORD"];
+    if (!username || !password) return;
+    await userManager.create({ username, password, orgId: username, role: "admin" });
+    console.log(`[startup] Admin user '${username}' created`);
+  }
 }
 
 main().catch((err) => {

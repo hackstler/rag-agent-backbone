@@ -14,6 +14,8 @@ import type { TopicManager } from "./application/managers/topic.manager.js";
 import type { OrganizationManager } from "./application/managers/organization.manager.js";
 import type { Agent } from "@mastra/core/agent";
 import type { PluginRegistry } from "./plugins/plugin-registry.js";
+import type { AuthConfig } from "./config/auth.config.js";
+import type { AuthStrategy } from "./domain/ports/auth-strategy.js";
 
 import { createAuthController } from "./api/controllers/auth.controller.js";
 import { createDocumentController } from "./api/controllers/document.controller.js";
@@ -33,6 +35,8 @@ export interface AppDependencies {
   orgManager: OrganizationManager;
   coordinatorAgent: Agent;
   pluginRegistry?: PluginRegistry;
+  authConfig: AuthConfig;
+  authStrategy: AuthStrategy | null;
 }
 
 export function createApp(deps: AppDependencies): Hono {
@@ -51,24 +55,25 @@ export function createApp(deps: AppDependencies): Hono {
   );
   app.use("*", errorHandler());
 
-  // ── Plugin routes ──────────────────────────────────────────────────────────
-  if (deps.pluginRegistry) {
-    deps.pluginRegistry.mountRoutes(app);
-  }
-
   // ── Routes ─────────────────────────────────────────────────────────────────
   app.route("/health", health);
 
   const auth = authMiddleware();
   app.use("/auth/me", auth);
   app.use("/auth/register", optionalAuth());
-  app.route("/auth", createAuthController(deps.userManager));
+  app.route("/auth", createAuthController(deps.userManager, deps.authConfig, deps.authStrategy));
 
+  // Auth middleware BEFORE plugin routes (plugins mount /chat, /ingest, etc.)
   app.use("/ingest/*", auth);
   app.use("/chat/*", auth);
   app.use("/conversations/*", auth);
   app.use("/topics/*", auth);
   app.use("/documents/*", auth);
+
+  // ── Plugin routes (after auth middleware) ──────────────────────────────────
+  if (deps.pluginRegistry) {
+    deps.pluginRegistry.mountRoutes(app);
+  }
 
   app.route("/conversations", createConversationController(deps.convManager));
   app.route("/topics", createTopicController(deps.topicManager));
@@ -81,7 +86,7 @@ export function createApp(deps: AppDependencies): Hono {
   // Admin endpoints — require admin role
   app.use("/admin/*", auth);
   app.use("/admin/*", requireRole("admin"));
-  app.route("/admin", createAdminController(deps.userManager, deps.orgManager));
+  app.route("/admin", createAdminController(deps.userManager, deps.orgManager, deps.authConfig));
 
   // Internal worker endpoints — worker JWT auth
   const workerAuth = requireWorker();
