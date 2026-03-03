@@ -119,7 +119,7 @@ describe("ConversationManager", () => {
 
       const result = await manager.resolveOrCreateByTitle("whatsapp:123", "u-1");
 
-      expect(repo.findByTitle).toHaveBeenCalledWith("whatsapp:123");
+      expect(repo.findByTitle).toHaveBeenCalledWith("whatsapp:123", "u-1");
       expect(repo.create).not.toHaveBeenCalled();
       expect(result).toBe("existing-id");
     });
@@ -134,7 +134,7 @@ describe("ConversationManager", () => {
 
       const result = await manager.resolveOrCreateByTitle("whatsapp:456", "u-1");
 
-      expect(repo.findByTitle).toHaveBeenCalledWith("whatsapp:456");
+      expect(repo.findByTitle).toHaveBeenCalledWith("whatsapp:456", "u-1");
       expect(repo.create).toHaveBeenCalledWith({ title: "whatsapp:456", userId: "u-1" });
       expect(result).toBe("new-id");
     });
