@@ -36,7 +36,7 @@ const memory = new Memory({
 })
 ```
 
-**Tools** — factory pattern (`src/agent/tools/`):
+**Tools** — factory pattern (`src/plugins/rag/tools/`):
 ```typescript
 // base.ts — port interface
 interface ToolEntry {

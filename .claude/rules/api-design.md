@@ -2,28 +2,43 @@
 
 ## Stack
 - **Hono** para todas las rutas. No usar Express, Fastify ni otros.
-- Cada router es un archivo separado en `src/api/`. Montados en `src/index.ts`.
+- Controllers en `src/api/controllers/` — uno por dominio. Montados en `src/app.ts`.
 - Usar `hono/cors`, `hono/logger`, `hono/secure-headers` como middleware global.
+- Plugins pueden registrar rutas propias via `routes()` en su definición.
 
-## Endpoints REST
-- Seguir este esquema de rutas:
-  - `POST /ingest` — crear recurso (ingestión)
-  - `GET /ingest/status/:id` — leer estado
-  - `POST /chat` — acción (no es CRUD puro)
-  - `GET /chat/stream` — SSE streaming
-  - `GET /conversations` — listar
-  - `GET /conversations/:id` — detalle
-  - `DELETE /conversations/:id` — eliminar
-  - `GET /health` — health check
+## Estructura de controllers
+
+| Controller | Rutas | Auth |
+|---|---|---|
+| `auth.controller.ts` | `/auth/register`, `/auth/login`, `/auth/me` | opcional / user |
+| `admin.controller.ts` | `/admin/users/*`, `/admin/organizations/*` | admin |
+| `document.controller.ts` | `/documents`, `/documents/:id` | user |
+| `conversation.controller.ts` | `/conversations`, `/conversations/:id` | user |
+| `topic.controller.ts` | `/topics`, `/topics/:id`, `/topics/:id/documents` | user |
+| `channel.controller.ts` | `/channels/whatsapp/*` | user |
+| `internal.controller.ts` | `/internal/whatsapp/*` | worker |
+| `health.ts` | `/health` | - |
+| Plugin RAG (routes) | `/chat`, `/ingest` | user |
+
+## Patrón de controller
+```typescript
+// Controller = función factory que recibe dependencias (managers)
+export function createXxxController(xxxManager: XxxManager) {
+  const router = new Hono()
+  // ...routes
+  return router
+}
+```
+- Controllers delgados: validar con Zod, delegar en manager, devolver respuesta.
+- NO poner lógica de negocio en controllers — eso va en managers.
 
 ## Response format
 ```typescript
 // Success
-{ data: T }  // o directamente T si es obvio
+{ data: T }
 
 // Error — SIEMPRE con ambos campos
 { error: "Category", message: "detail" }
-// Ejemplo: { error: "NotFound", message: "User 'abc' not found" }
 // Categorías: NotFound, Conflict, Validation, Unauthorized, Forbidden, InternalError
 
 // Paginado
@@ -34,7 +49,10 @@
 - `200` — OK (GET, acción completada)
 - `201` — Created (POST que crea recurso)
 - `400` — Bad Request (validación fallida)
+- `401` — Unauthorized (sin token o token inválido)
+- `403` — Forbidden (sin permisos, role incorrecto)
 - `404` — Not Found
+- `409` — Conflict (duplicado)
 - `500` — Internal Server Error
 - `503` — Service Unavailable (DB down, en health check)
 
@@ -51,12 +69,17 @@
 - Emitir `done` al final siempre, incluso si hay error.
 
 ## Error handling
-- Usar `app.onError()` como fallback global.
-- Loggear errores con contexto (route, params).
+- DomainErrors se mapean automáticamente a HTTP status en `error-handler.middleware.ts`.
+- Usar `app.onError()` como fallback global en `src/app.ts`.
 - No exponer stack traces en producción.
 - En streaming: emitir `{ type: "error", message: "..." }` y cerrar el stream.
 
-## Autenticación (cuando se active)
-- Header `X-API-Key` para autenticación simple por API key.
-- Header `Authorization: Bearer <jwt>` para JWT.
-- Implementar como middleware, no en cada route handler.
+## Autenticación
+- **JWT Bearer**: `Authorization: Bearer <jwt>` — para usuarios y workers.
+- **API-Key**: `X-API-Key` — para machine-to-machine.
+- Middleware en `src/api/middleware/auth.ts`:
+  - `authMiddleware()` — valida JWT/API-Key, extrae `user` (userId, orgId, role)
+  - `requireRole("admin")` — restringe a admins
+  - `requireWorker()` — valida JWT con `role: "worker"`
+  - `optionalAuth()` — auth opcional (para register)
+- Auth strategy configurable: `password` o `firebase` (via `AUTH_STRATEGY` env var)

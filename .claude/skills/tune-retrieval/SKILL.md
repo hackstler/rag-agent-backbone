@@ -40,7 +40,7 @@ Identifica problemas con chunking, thresholds, o estrategias de query.
    | Preguntas parafraseadas fallan | Sin query enhancement | Activar `multi-query` en config |
    | Latencia >3s por request | Sin caché, reranking lento | Revisar reranker config |
 
-5. **Proponer cambios en `src/config/rag.config.ts`**
+5. **Proponer cambios en `src/plugins/rag/config/rag.config.ts`**
    Mostrar el diff concreto a aplicar.
 
 ## Output esperado

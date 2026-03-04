@@ -58,7 +58,7 @@ Read `.claude/agents/reference/infra/railway.md` for detailed Railway reference.
 
 == POSTGRESQL + PGVECTOR ==
 
-**Connection pool** (`src/db/client.ts`):
+**Connection pool** (`src/infrastructure/db/client.ts`):
 ```typescript
 const pool = new Pool({
   connectionString: process.env["DATABASE_URL"],

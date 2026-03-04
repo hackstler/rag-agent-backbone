@@ -1,6 +1,6 @@
 # Hono + Drizzle + Mastra — Deep Stack Rules
 
-Complementa las reglas existentes en `api-design.md`, `data-model.md` y `rag-pipeline.md`.
+Complementa las reglas en `api-design.md`, `data-model.md`, `rag-pipeline.md` y `plugins.md`.
 
 ---
 
@@ -14,41 +14,39 @@ No alterar el orden. Auth siempre después de CORS.
 
 ### Context variables
 ```typescript
-// Declarar tipos en ContextVariableMap (global)
 declare module 'hono' {
   interface ContextVariableMap {
-    user: { userId: string; orgId: string; role: "user" }
-    orgId: string  // set by requireWorker
+    user: { userId: string; orgId: string; role: "user" | "admin" }
+    workerOrgId: string  // set by requireWorker (optional)
   }
 }
 
-// Usar en handlers
-const user = c.get("user")
-const orgId = c.get("orgId")
+// En handlers
+const user = c.get("user")       // authMiddleware
+const orgId = c.get("workerOrgId") // requireWorker
 ```
 
-### SSE Streaming
+### App factory
 ```typescript
-return stream(c, async (writer) => {
-  try {
-    // emitir eventos con writer.write()
-  } finally {
-    // cleanup: siempre emitir "done" event
-  }
-})
+// src/app.ts — crea la app Hono con todas las rutas
+export function createApp(deps: AppDeps): Hono {
+  const app = new Hono()
+  // middleware global
+  // rutas de controllers
+  // rutas de plugins (via pluginRegistry.getRoutes())
+  // error handler
+  return app
+}
 ```
 
 ### Validación
 - Validar con Zod **antes** de procesar cualquier input
-- Parsear body: `const body = schema.parse(await c.req.json())`
-- Parsear query: `const query = schema.parse(c.req.query())`
+- `const body = schema.parse(await c.req.json())`
+- `const query = schema.parse(c.req.query())`
 
 ### Response format
 ```typescript
-// Success
 return c.json({ data: result })
-
-// Error — always { error: "Category", message: "detail" }
 return c.json({ error: "Validation", message: "Invalid input" }, 400)
 ```
 
@@ -60,14 +58,12 @@ return c.json({ error: "Validation", message: "Invalid input" }, 400)
 ```typescript
 id: uuid('id').defaultRandom().primaryKey()
 ```
-Siempre `defaultRandom()` para PKs. No usar auto-increment.
 
 ### Timestamps
 ```typescript
 createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 ```
-Siempre `withTimezone: true`. Almacenar UTC.
 
 ### Upserts atómicos
 ```typescript
@@ -89,12 +85,12 @@ export const tableRelations = relations(table, ({ one, many }) => ({
 
 ### Type inference
 ```typescript
-// Infrastructure types (in src/infrastructure/db/schema.ts)
+// Infrastructure types (src/infrastructure/db/schema.ts)
 export type Session = typeof whatsappSessions.$inferSelect
 export type NewSession = typeof whatsappSessions.$inferInsert
 
-// Domain entities (in src/domain/entities/index.ts) — pure interfaces
-// Domain/Application layers import from domain entities, NOT schema
+// Domain entities (src/domain/entities/index.ts) — pure interfaces
+// Domain/Application importan de domain, NO de schema
 ```
 
 ### Pool singleton
@@ -114,11 +110,11 @@ Un solo pool por proceso. No crear pools por request.
 ### Agent
 ```typescript
 const agent = new Agent({
-  id: "rag-agent",
-  name: "RAG Agent",
+  id: "coordinator",
+  name: "Emilio",
   instructions: systemPrompt,
   model: geminiModel,
-  tools: toolRegistry,
+  tools: pluginRegistry.getAllTools(),  // tools de TODOS los plugins
   memory: postgresMemory,
 })
 ```
@@ -133,40 +129,40 @@ const memory = new PostgresStore({
 - **Thread** = conversationId (cada conversación es un thread)
 - **Resource** = orgId (para aislamiento multi-tenant)
 
-### Tools — Factory Pattern
+### Tools — Plugin Pattern
 ```typescript
-// Cada tool exporta un ToolEntry
-export interface ToolEntry {
-  key: string
-  create(deps: ToolDeps): MastraTool
-}
+// Cada plugin expone tools via su propiedad `tools`
+// El coordinator las recibe todas agregadas por pluginRegistry.getAllTools()
 
-// Registry filtra por config
-export function createToolRegistry(deps: ToolDeps): Record<string, MastraTool> {
-  return enabledEntries
-    .filter(entry => toolsConfig[entry.key]?.enabled)
-    .reduce((acc, entry) => ({ ...acc, [entry.key]: entry.create(deps) }), {})
+// Dentro de un plugin, tools siguen el factory pattern:
+export function createSearchDocumentsTool(deps: ToolDeps) {
+  return createTool({
+    id: "searchDocuments",
+    description: "...",
+    inputSchema: z.object({ ... }),
+    execute: async ({ context }) => { ... }
+  })
 }
 ```
 
 ### Payload unwrapping (Mastra 1.5+)
-Mastra wraps tool results en `.payload`. Necesita type assertions:
+Mastra wraps tool results en `.payload`:
 ```typescript
 const result = await tool.execute(input) as { payload: T }
 const data = result.payload
 ```
 
 ### System prompt
-Usar secciones con `== TÍTULO ==` y template literals para condicionales:
+Secciones con `== TÍTULO ==` y template literals:
 ```typescript
 const systemPrompt = `
 == ROL ==
-Eres un asistente especializado...
-
-== CONTEXTO ==
-${context ? `Documentos relevantes:\n${context}` : 'No hay documentos disponibles.'}
+Eres Emilio, asistente especializado...
 
 == HERRAMIENTAS ==
-${tools.length > 0 ? `Tienes acceso a: ${tools.join(', ')}` : ''}
+${pluginDescriptions}
+
+== REGLAS ==
+...
 `
 ```

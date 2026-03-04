@@ -82,7 +82,7 @@ Request → Classify request type → Route to appropriate agent
 - "refactor", "design", "architecture" → `typescript-architect`
 - "retrieval", "chunks", "embedding", "score" → `rag-specialist`
 - "deploy", "Docker", "Railway", "production" → `infra-specialist`
-- File path mentions `src/rag/` → `rag-specialist`
+- File path mentions `src/plugins/rag/pipeline/` → `rag-specialist`
 - File path mentions `src/agent/` → `mastra-expert`
 - File path mentions `Dockerfile` or `docker-compose` → `infra-specialist`
 

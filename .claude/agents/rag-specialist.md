@@ -13,16 +13,16 @@ You are a RAG (Retrieval-Augmented Generation) specialist with deep expertise in
 
 ```
 User query
-  → Query transformation (multi-query, 3 variants) [src/rag/query-transformer.ts]
-  → Embedding (Gemini gemini-embedding-001, 768-dim) [src/rag/embeddings.ts]
-  → Retrieval (pgvector cosine similarity, topK=10, threshold=0.3) [src/rag/retriever.ts]
-  → Reranking (DISABLED by default) [src/rag/reranker.ts]
+  → Query transformation (multi-query, 3 variants) [src/plugins/rag/pipeline/query-transformer.ts]
+  → Embedding (Gemini gemini-embedding-001, 768-dim) [src/plugins/rag/pipeline/embeddings.ts]
+  → Retrieval (pgvector cosine similarity, topK=10, threshold=0.3) [src/plugins/rag/pipeline/retriever.ts]
+  → Reranking (DISABLED by default) [src/plugins/rag/pipeline/reranker.ts]
   → Context building [src/agent/workflow.ts]
   → LLM generation (Gemini 2.5-flash) [src/agent/rag-agent.ts]
   → Persistence [src/api/helpers/persist-messages.ts]
 ```
 
-**Current config** (`src/config/rag.config.ts`):
+**Current config** (`src/plugins/rag/config/rag.config.ts`):
 - topK: 10, similarityThreshold: 0.3 (aggressive — catches more)
 - chunkSize: 512, chunkOverlap: 50 (10% overlap)
 - chunkingStrategy: "fixed" (default), "hierarchical" for YouTube
@@ -86,13 +86,13 @@ For deep details on each stage, read:
 
 == KEY FILES ==
 
-- Pipeline orchestration: `src/rag/retrieval-pipeline.ts`
-- Embeddings: `src/rag/embeddings.ts` + `src/rag/adapters.ts`
-- Retriever (pgvector SQL): `src/rag/retriever.ts`
-- Chunker: `src/rag/chunker.ts`
-- Reranker: `src/rag/reranker.ts`
-- Query transformer: `src/rag/query-transformer.ts`
-- Config: `src/config/rag.config.ts`
+- Pipeline orchestration: `src/plugins/rag/pipeline/retrieval-pipeline.ts`
+- Embeddings: `src/plugins/rag/pipeline/embeddings.ts` + `src/plugins/rag/pipeline/adapters.ts`
+- Retriever (pgvector SQL): `src/plugins/rag/pipeline/retriever.ts`
+- Chunker: `src/plugins/rag/pipeline/chunker.ts`
+- Reranker: `src/plugins/rag/pipeline/reranker.ts`
+- Query transformer: `src/plugins/rag/pipeline/query-transformer.ts`
+- Config: `src/plugins/rag/config/rag.config.ts`
 - Document processor: `src/ingestion/processor.ts`
 - Schema (vector column): `src/db/schema.ts` (documentChunks table)
 

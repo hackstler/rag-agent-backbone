@@ -11,8 +11,8 @@
 
 ## This Project's Implementation
 
-**Chunker**: `src/rag/chunker.ts`
-**Config**: `src/config/rag.config.ts` — `chunkingStrategy: "fixed"`, `chunkSize: 512`, `chunkOverlap: 50`
+**Chunker**: `src/plugins/rag/pipeline/chunker.ts`
+**Config**: `src/plugins/rag/config/rag.config.ts` — `chunkingStrategy: "fixed"`, `chunkSize: 512`, `chunkOverlap: 50`
 
 **Content-type override** (`src/ingestion/processor.ts`):
 ```typescript

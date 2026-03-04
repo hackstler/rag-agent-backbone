@@ -5,7 +5,7 @@
 **How**: Single query → embed → cosine similarity → top-K results
 
 ```typescript
-// src/rag/retriever.ts
+// src/plugins/rag/pipeline/retriever.ts
 const result = await db.execute(sql`
   SELECT dc.id, dc.content, d.title, d.source,
     1 - (dc.embedding <=> ${embeddingStr}::vector) as similarity_score
@@ -27,7 +27,7 @@ const result = await db.execute(sql`
 **How**: Original query → N reformulated queries → embed each → merge + dedup by chunk ID → keep highest score
 
 ```typescript
-// src/rag/retriever.ts — retrieveMultiQuery()
+// src/plugins/rag/pipeline/retriever.ts — retrieveMultiQuery()
 const allResults = await Promise.all(
   queryEmbeddings.map(emb => retrieve(emb, { ...options, topK: options.topK * 2 }))
 )

@@ -26,7 +26,7 @@ const myTool = createTool({
 
 ## This Project's Tool Pattern
 
-### ToolEntry Interface (`src/agent/tools/base.ts`)
+### ToolEntry Interface (`src/plugins/rag/tools/base.ts`)
 ```typescript
 export interface ToolRegistryDeps {
   embedder: IEmbedder
@@ -40,7 +40,7 @@ export interface ToolEntry {
 }
 ```
 
-### Tool Implementation Example (`src/agent/tools/search-documents.ts`)
+### Tool Implementation Example (`src/plugins/rag/tools/search-documents.ts`)
 ```typescript
 export const searchDocumentsEntry: ToolEntry = {
   key: "searchDocuments",
@@ -69,7 +69,7 @@ export function createSearchDocumentsTool({ embedder, retriever, reranker }: Too
 }
 ```
 
-### Registry (`src/agent/tools/index.ts`)
+### Registry (`src/plugins/rag/tools/index.ts`)
 ```typescript
 const ALL_TOOLS: ToolEntry[] = [
   searchDocumentsEntry,
@@ -86,7 +86,7 @@ export function createToolRegistry(deps: ToolRegistryDeps) {
 }
 ```
 
-### Config (`src/config/tools.config.ts`)
+### Config (`src/plugins/rag/config/tools.config.ts`)
 ```typescript
 export const toolsConfig = {
   searchDocuments: { enabled: true, description: "..." },
@@ -97,11 +97,11 @@ export const toolsConfig = {
 
 ## Adding a New Tool
 
-1. Create `src/agent/tools/my-tool.ts`:
+1. Create `src/plugins/rag/tools/my-tool.ts`:
    - Export `myToolEntry: ToolEntry`
    - Implement factory function with Zod schemas
-2. Add to `ALL_TOOLS` array in `src/agent/tools/index.ts`
-3. Add config entry in `src/config/tools.config.ts`
+2. Add to `ALL_TOOLS` array in `src/plugins/rag/tools/index.ts`
+3. Add config entry in `src/plugins/rag/config/tools.config.ts`
 4. Done — no other files need modification (OCP)
 
 ## Tool Description Best Practices

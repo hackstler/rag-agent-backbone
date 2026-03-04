@@ -13,8 +13,8 @@ Muestra el estado actual del agente: configuración activa, tools registradas y 
 
 ### Paso 1 — Leer archivos (en paralelo)
 - `setup-responses.md` (si existe)
-- `src/config/rag.config.ts`
-- `src/config/tools.config.ts`
+- `src/plugins/rag/config/rag.config.ts`
+- `src/plugins/rag/config/tools.config.ts`
 
 ### Paso 2 — Verificar servidor
 ```bash

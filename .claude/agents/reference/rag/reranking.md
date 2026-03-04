@@ -12,7 +12,7 @@ Reranking re-scores the initial results with a more sophisticated model.
 ## This Project's Setup
 
 **Status**: DISABLED (`enableReranking: false`)
-**Implementation**: `src/rag/reranker.ts`
+**Implementation**: `src/plugins/rag/pipeline/reranker.ts`
 **Config**: `rerankTopK: 3` (when enabled, return top 3 after reranking)
 
 ## Reranking Approaches

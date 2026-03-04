@@ -12,8 +12,8 @@
 ## This Project's Setup
 
 **Model**: `gemini-embedding-001` (768 dimensions)
-**Config**: `src/config/rag.config.ts` — `embeddingModel: "gemini-embedding-001"`, `embeddingDimensions: 768`
-**Implementation**: `src/rag/embeddings.ts` + `src/rag/adapters.ts`
+**Config**: `src/plugins/rag/config/rag.config.ts` — `embeddingModel: "gemini-embedding-001"`, `embeddingDimensions: 768`
+**Implementation**: `src/plugins/rag/pipeline/embeddings.ts` + `src/plugins/rag/pipeline/adapters.ts`
 **Schema**: `src/db/schema.ts` — `vector("embedding", { dimensions: EMBEDDING_DIM })`
 
 ```typescript
@@ -45,7 +45,7 @@ const EMBEDDING_DIM = Number(process.env["EMBEDDING_DIM"] ?? 768)
 
 Steps:
 1. Update `EMBEDDING_DIM` env var (e.g., from 768 to 1536)
-2. Update embedder in `src/rag/adapters.ts`
+2. Update embedder in `src/plugins/rag/pipeline/adapters.ts`
 3. Drop and recreate the vector column + index:
    ```sql
    ALTER TABLE document_chunks DROP COLUMN embedding;

@@ -1,8 +1,14 @@
 # Multi-Tenancy Rules
 
+## Modelo de multi-tenancy
+- `orgId` es un string libre (no FK) presente en users, documents, topics, sessions.
+- Cada usuario pertenece a una sola org. Datos scoped por orgId.
+- WhatsApp sessions son **per-user** (no per-org), con orgId denormalizado del user.
+- Cascade delete: org → users → sessions, conversations, messages.
+
 ## Tabla `whatsappSessions`
 
-Schema con Drizzle en `src/infrastructure/db/schema.ts`:
+Schema en `src/infrastructure/db/schema.ts`:
 
 ```typescript
 export const whatsappSessions = pgTable('whatsapp_sessions', {
@@ -16,55 +22,63 @@ export const whatsappSessions = pgTable('whatsapp_sessions', {
 })
 ```
 
-- Migrated from per-org to per-user in `0002_whatsapp_per_user.sql`
 - Upsert con `onConflictDoUpdate` sobre `userId` (one session per user)
-- `orgId` is denormalized from the user record for query convenience (NOT unique)
-- Cascade: deleting a user automatically deletes their WhatsApp session via FK
-- Exportar tipos: `WhatsAppSession` / `NewWhatsAppSession`
+- `orgId` denormalizado del user record para queries rápidas (NOT unique)
+- Cascade: borrar user → borra su sesión WhatsApp via FK
 
-## Router `channels.ts` (user-facing)
+## WhatsApp Manager
 
-Archivo: `src/api/channels.ts`
+Archivo: `src/application/managers/whatsapp.manager.ts`
+
+Gestiona toda la lógica de sesiones WhatsApp:
+- `getStatusForUser(userId)` — estado + phone del usuario autenticado
+- `getQrForUser(userId)` — qrData si status = 'qr'
+- `enableForUser(userId, orgId)` — crear sesión pending (409 si existe)
+- `disconnectForUser(userId)` — marcar como disconnected
+- `listActiveSessions()` — sesiones no-disconnected para el worker
+- `reportQr(userId, qrData)` — upsert QR desde worker
+- `reportStatus(userId, status, phone?)` — upsert status desde worker
+- `resolveOrgId(userId)` — obtener orgId del user record
+
+## Channel Controller (user-facing)
+
+Archivo: `src/api/controllers/channel.controller.ts`
 
 - Endpoints bajo `/channels/whatsapp/*`
-- Autenticacion: JWT de usuario (`authMiddleware`)
-- **Siempre** filtrar por `c.get('user').userId` — sessions are per-user now
+- Auth: JWT de usuario (`authMiddleware`)
+- **Siempre** filtrar por `c.get('user').userId` — sessions are per-user
 - Endpoints:
-  - `GET /channels/whatsapp/status` — session status + phone for the authenticated user
-  - `GET /channels/whatsapp/qr` — qrData actual (si status = 'qr')
-  - `POST /channels/whatsapp/enable` — create a pending session for the user (409 if exists)
-  - `POST /channels/whatsapp/disconnect` — mark session as disconnected
+  - `GET /channels/whatsapp/status` — session status + phone
+  - `GET /channels/whatsapp/qr` — qrData (si status = 'qr')
+  - `POST /channels/whatsapp/enable` — crear sesión pending (409 si existe)
+  - `POST /channels/whatsapp/disconnect` — marcar disconnected
 
-## Router `internal.ts` (worker-facing)
+## Internal Controller (worker-facing)
 
-Archivo: `src/api/internal.ts`
+Archivo: `src/api/controllers/internal.controller.ts`
 
 - Endpoints bajo `/internal/whatsapp/*`
-- Autenticacion: JWT de worker (`requireWorker` middleware)
+- Auth: JWT de worker (`requireWorker` middleware)
 - Body validado con Zod en cada endpoint
-- All endpoints accept `userId` (UUID) instead of `orgId` — the orgId is resolved from the user record
+- Todos aceptan `userId` (UUID) — orgId se resuelve del user record
 - Endpoints:
-  - `GET /internal/whatsapp/sessions` — list active (non-disconnected) sessions as `[{ userId, orgId }]`
-  - `POST /internal/whatsapp/qr` — upsert session with qrData, keyed by userId
-  - `POST /internal/whatsapp/status` — upsert session with status/phone, keyed by userId
-  - `POST /internal/whatsapp/message` — inject message to ragAgent; orgId resolved from userId for RAG resourceId
+  - `GET /internal/whatsapp/sessions` — sesiones activas como `[{ userId, orgId }]`
+  - `POST /internal/whatsapp/qr` — upsert QR
+  - `POST /internal/whatsapp/status` — upsert status/phone
+  - `POST /internal/whatsapp/message` — inyectar mensaje al coordinator agent
 
-## Guards de autenticacion
+## Guards de autenticación
 
-- `authMiddleware`: valida JWT with `role: "user" | "admin"`, extracts `userId` + `orgId`
-- `requireWorker`: valida JWT with `role: "worker"` (no userId needed in token)
-- Ambos middleware en `src/api/middleware/auth.ts`
-- Montar en `src/index.ts`:
-  ```typescript
-  app.use('/channels/*', auth)
-  app.route('/channels', channelsRouter)
-  app.use('/internal/*', workerAuth)
-  app.route('/internal', internalRouter)
-  ```
+Middleware en `src/api/middleware/auth.ts`:
+- `authMiddleware()`: JWT (role: user|admin) → extrae `userId` + `orgId`
+- `requireRole("admin")`: solo admins
+- `requireWorker()`: JWT (role: worker)
+- `optionalAuth()`: auth opcional
 
-## Restricciones
-
-- **NO tocar** schema existente (users, documents, chunks, conversations, messages)
-- **NO tocar** pipeline RAG (retriever, embedder, chunker, reranker)
-- **NO tocar** auth existente (login, register, JWT de usuario)
-- El endpoint `/internal/whatsapp/message` pasa `orgId` (resolved from userId) al ragAgent como `resourceId`
+Montado en `src/app.ts`:
+```typescript
+app.use("/channels/*", auth)
+app.route("/channels", createChannelController(deps))
+app.use("/internal/*", workerAuth)
+app.route("/internal", createInternalController(deps))
+```

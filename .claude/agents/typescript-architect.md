@@ -21,7 +21,7 @@ You are a senior TypeScript architect with deep expertise in SOLID principles, C
 - Anti-pattern: A handler that validates + fetches + transforms + persists + responds. Split into layers.
 
 **OCP (Open/Closed)**
-- Tool factory: add a tool by creating a new file in `src/agent/tools/` + one line in `tools/index.ts` + config in `tools.config.ts`. No existing tool is modified.
+- Tool factory: add a tool by creating a new file in `src/plugins/rag/tools/` + one line in `tools/index.ts` + config in `tools.config.ts`. No existing tool is modified.
 - Content type loaders: each loader in `src/ingestion/loaders/` is independent. Add YouTube without touching PDF.
 - Middleware chain: add auth without modifying route handlers.
 - Anti-pattern: Boolean flags (`if (isWhatsApp) { ... } else { ... }`). Use composition instead.
@@ -40,10 +40,10 @@ You are a senior TypeScript architect with deep expertise in SOLID principles, C
 
 **DIP (Dependency Inversion)**
 - Domain depends on ports (interfaces), never on implementations:
-  - `src/rag/interfaces.ts` defines `IEmbedder`, `IRetriever`, `IReranker` (ports)
-  - `src/rag/adapters.ts` provides concrete implementations (infrastructure)
-  - `src/agent/tools/base.ts` defines `ToolEntry` interface (port)
-  - `src/agent/tools/*.ts` implement it (infrastructure)
+  - `src/plugins/rag/pipeline/interfaces.ts` defines `IEmbedder`, `IRetriever`, `IReranker` (ports)
+  - `src/plugins/rag/pipeline/adapters.ts` provides concrete implementations (infrastructure)
+  - `src/plugins/rag/tools/base.ts` defines `ToolEntry` interface (port)
+  - `src/plugins/rag/tools/*.ts` implement it (infrastructure)
 - Worker: `domain/ports/BackbonePort.ts` → `infrastructure/http/BackboneClient.ts`
 - Composition root: `src/index.ts` wires everything. No service locator, no DI container.
 
@@ -59,9 +59,9 @@ Infrastructure (DB, HTTP, external services, frameworks)
 ```
 
 **This project's mapping**:
-- Domain: `src/rag/interfaces.ts` (retriever/embedder/reranker ports)
-- Application: `src/rag/retrieval-pipeline.ts` (orchestrates retrieve + rerank)
-- Infrastructure: `src/rag/adapters.ts`, `src/db/client.ts`, `src/api/*.ts`
+- Domain: `src/plugins/rag/pipeline/interfaces.ts` (retriever/embedder/reranker ports)
+- Application: `src/plugins/rag/pipeline/retrieval-pipeline.ts` (orchestrates retrieve + rerank)
+- Infrastructure: `src/plugins/rag/pipeline/adapters.ts`, `src/infrastructure/db/client.ts`, `src/api/controllers/*.ts`
 
 **Worker project's mapping** (strictest):
 - Domain: `domain/entities/WhatsAppMessage.ts`, `domain/ports/BackbonePort.ts`, `domain/ports/DedupPort.ts`

@@ -3,7 +3,7 @@
 ## Connection Pool
 
 ```typescript
-// src/db/client.ts
+// src/infrastructure/db/client.ts
 import { Pool } from "pg"
 import { drizzle } from "drizzle-orm/node-postgres"
 
@@ -126,7 +126,7 @@ npx drizzle-kit push      # directly applies schema.ts to DB, ignores migrations
 ### Programmatic Migrations (This Project)
 
 ```typescript
-// src/db/client.ts
+// src/infrastructure/db/client.ts
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 
 export async function runMigrations() {

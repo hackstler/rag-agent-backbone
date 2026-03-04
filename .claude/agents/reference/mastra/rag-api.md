@@ -29,7 +29,7 @@ const chunks = await doc.chunk({
 
 ## Embedding
 
-This project uses custom embeddings via `src/rag/embeddings.ts`:
+This project uses custom embeddings via `src/plugins/rag/pipeline/embeddings.ts`:
 
 ```typescript
 import { createGoogleGenerativeAI } from "@ai-sdk/google"
@@ -49,7 +49,7 @@ Mastra also provides built-in embedding via `embed()` function.
 ### pgvector (This Project)
 
 ```typescript
-// Custom implementation in src/rag/retriever.ts
+// Custom implementation in src/plugins/rag/pipeline/retriever.ts
 const result = await db.execute(sql`
   SELECT
     dc.id, dc.content, dc.document_id,

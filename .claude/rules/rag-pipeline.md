@@ -1,40 +1,73 @@
 # RAG Pipeline Rules
 
-## Stack obligatorio
-- **Mastra.ai** para orquestación LLM. No usar LangChain JS ni Vercel AI SDK directamente (usarlos solo como referencia en `references/`).
-- **pgvector** para búsqueda vectorial. No usar Pinecone, Weaviate ni otros en el stack principal.
-- **Drizzle ORM** para todas las queries. No usar Prisma ni queries SQL raw excepto en el retriever (donde se necesita la sintaxis `<=>` de pgvector).
+## Ubicación
+El pipeline RAG vive dentro del **plugin RAG**: `src/plugins/rag/pipeline/`.
+No es código suelto en `src/rag/` — está encapsulado en el plugin.
 
-## Pipeline de RAG — orden estricto
-1. Query transformation (si está habilitada en `ragConfig`)
+## Stack obligatorio
+- **Mastra.ai** para orquestación LLM. No usar LangChain JS ni Vercel AI SDK.
+- **pgvector** para búsqueda vectorial. No usar Pinecone, Weaviate ni otros.
+- **Drizzle ORM** para queries. SQL raw solo en el retriever (operador `<=>` de pgvector).
+
+## Pipeline — orden estricto
+1. Query transformation (si habilitada en `rag.config.ts`)
 2. Embedding de la query transformada
 3. Retrieval con `retrieve()` o `retrieveMultiQuery()`
-4. Reranking (si `ragConfig.enableReranking === true`)
+4. Reranking (si `enableReranking === true` en config)
 5. Context building con `buildContext()`
 6. LLM generation (streaming o completo)
 7. Persistencia en DB (después de completar la respuesta)
 
 ## Embeddings
-- OpenAI `text-embedding-3-small` en producción (1536 dims)
-- Ollama `nomic-embed-text` en local (768 dims)
-- **Importante**: la dimensión del vector debe coincidir con la columna `vector(1536)` en el schema. Si cambias el modelo, actualiza el schema y crea una migración.
+- **Gemini** `gemini-embedding-001` (768 dims) — modelo principal
+- La dimensión del vector debe coincidir con la columna en el schema.
+- Si cambias el modelo, actualiza el schema y crea una migración.
+
+## Config del pipeline
+
+Archivo: `src/plugins/rag/config/rag.config.ts`
+
+Valores clave:
+- `topK`: 10 (chunks a recuperar)
+- `similarityThreshold`: 0.3
+- `chunkSize` / `chunkOverlap`: configurable por caso de uso
+- `queryEnhancement`: "multi-query" (genera 3 variantes)
+- `enableReranking`: false (activar con COHERE_API_KEY)
 
 ## Chunking
 - No pre-chunkar en el loader. El loader devuelve texto completo, el chunker lo divide.
 - Respetar la estrategia definida en `ragConfig.chunkingStrategy`.
-- Overlap mínimo 10% del chunk size para mantener continuidad de contexto.
+- Overlap mínimo 10% del chunk size para continuidad de contexto.
+- Estrategias: fixed, semantic, hierarchical (YouTube usa hierarchical).
 
 ## Retrieval
-- Siempre filtrar chunks de documentos con `status = 'indexed'`. No recuperar de docs en estado `pending` o `failed`.
-- El threshold de similitud por defecto es 0.7. Documentos por debajo no se incluyen en contexto.
+- Filtrar chunks de documentos con `status = 'indexed'` solamente.
 - Con multi-query: deduplicar por `chunk.id`, mantener el score más alto.
+- Búsqueda híbrida: vector similarity + full-text search (tsvector).
+
+## Tools del plugin RAG
+
+Definidas en `src/plugins/rag/tools/`:
+- `searchDocuments` — búsqueda RAG en documentos indexados
+- `saveNote` — persistir documentos/notas
+- `searchWeb` — fallback web via Perplexity (requiere PERPLEXITY_API_KEY)
+
+Habilitación controlada por `src/plugins/rag/config/tools.config.ts`.
+
+## Ingestion
+
+Pipeline en `src/plugins/rag/ingestion/`:
+- `loader.ts` — carga archivos/URLs (incluye YouTube via `loaders/youtube.ts`)
+- `processor.ts` — chunking + embedding
+- `enricher.ts` — enriquecimiento de metadata
+- `contextualizer.ts` — prefijos de contexto por chunk
 
 ## Persistencia
-- Guardar mensajes de usuario Y asistente después de completar la respuesta (no durante streaming).
+- Guardar mensajes user + assistant después de completar la respuesta.
 - No guardar chunks completos en `messages.metadata`. Solo `chunk.id[]`.
 - Actualizar `conversations.updated_at` en cada interacción.
 
 ## Errores
-- Si el retrieval no encuentra chunks: responder "No encuentro información sobre eso en los documentos disponibles" (o equivalente en el idioma configurado). No inventar.
-- Si el LLM falla: propagar el error con mensaje descriptivo. No reintentar automáticamente.
-- Si el embedding falla: marcar el documento como `failed` en DB.
+- Sin chunks: responder "No encuentro información sobre eso en los documentos disponibles".
+- LLM falla: propagar error descriptivo. No reintentar automáticamente.
+- Embedding falla: marcar documento como `failed` en DB.

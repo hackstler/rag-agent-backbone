@@ -121,12 +121,12 @@ chunking_strategy_override: [valor | none]
 web_search: [true | false]
 ```
 
-**2. Edita `src/config/rag.config.ts`:**
+**2. Edita `src/plugins/rag/config/rag.config.ts`:**
 - `agentName`, `agentDescription`, `responseLanguage`, `useCase`
 - Solo si hay override de chunking: `chunkingStrategy`, `chunkSize`
 - No toques topK, reranking, queryEnhancement — los maneja el preset
 
-**3. Edita `src/config/tools.config.ts`:**
+**3. Edita `src/plugins/rag/config/tools.config.ts`:**
 - `searchWeb.enabled = true / false` según P4
 
 **4. Edita `CLAUDE.md`:**

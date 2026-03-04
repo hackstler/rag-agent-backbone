@@ -94,10 +94,10 @@ Si el tipo no queda claro de la descripción, pregunta antes de generar.
 
 ### Paso 2 — Leer archivos de referencia (en paralelo)
 
-- `src/agent/tools/search-web.ts` — patrón ToolEntry sin deps (el más común)
-- `src/agent/tools/base.ts` — interfaces ToolEntry + ToolRegistryDeps
-- `src/agent/tools/index.ts` — ALL_TOOLS array actual
-- `src/config/tools.config.ts` — toolsConfig actual
+- `src/plugins/rag/tools/search-web.ts` — patrón ToolEntry sin deps (el más común)
+- `src/plugins/rag/tools/base.ts` — interfaces ToolEntry + ToolRegistryDeps
+- `src/plugins/rag/tools/index.ts` — ALL_TOOLS array actual
+- `src/plugins/rag/config/tools.config.ts` — toolsConfig actual
 
 ### Paso 3 — Derivar nombres
 
@@ -112,7 +112,7 @@ Del `<tool-name>` en kebab-case:
 Los tipos A, B, C, D **no necesitan ToolRegistryDeps** (no hacen búsqueda vectorial).
 Usa `(_deps)` en `Entry.create` y no incluyas `deps` en la factory function.
 
-### Paso 5 — Generar `src/agent/tools/<tool-name>.ts`
+### Paso 5 — Generar `src/plugins/rag/tools/<tool-name>.ts`
 
 Estructura base:
 
@@ -205,7 +205,7 @@ execute: async ({ inputFields }) => {
 },
 ```
 
-### Paso 6 — Actualizar `src/agent/tools/index.ts`
+### Paso 6 — Actualizar `src/plugins/rag/tools/index.ts`
 
 ```typescript
 import { <camelCase>Entry } from "./<tool-name>.js";  // ← añadir import
@@ -217,7 +217,7 @@ const ALL_TOOLS: ToolEntry[] = [
 ];
 ```
 
-### Paso 7 — Actualizar `src/config/tools.config.ts`
+### Paso 7 — Actualizar `src/plugins/rag/config/tools.config.ts`
 
 ```typescript
 <camelCase>: {

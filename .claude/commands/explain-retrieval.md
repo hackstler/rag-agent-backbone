@@ -15,7 +15,7 @@ Explica paso a paso cómo el RAG pipeline procesa una query específica:
 
 ## Qué hace Claude
 
-1. Leer `src/config/rag.config.ts` para entender la configuración activa
+1. Leer `src/plugins/rag/config/rag.config.ts` para entender la configuración activa
 2. Ejecutar la query contra el servidor:
    ```bash
    curl -X POST http://localhost:3000/chat \

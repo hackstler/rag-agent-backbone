@@ -1,10 +1,9 @@
-# rag-agent-backbone
+# agent-grass
 
 ## Propósito
-Template production-ready para desplegar agentes RAG especializados por cliente.
-Clona el repo, ejecuta `/setup` en Claude Code, y tienes el agente configurado y listo para ingestar documentos.
+Plataforma multi-tenant de agentes RAG con integración WhatsApp para generación de presupuestos de césped artificial. Basado en el template rag-agent-backbone, adaptado como MVP para cliente.
 
-## Stack Técnico (fijo — no configurable)
+## Stack Técnico
 - **Runtime**: Node.js + TypeScript strict
 - **API**: Hono (edge-first, SSE nativo)
 - **LLM Orchestration**: Mastra.ai (TypeScript nativo, RAG module nativo)
@@ -12,102 +11,224 @@ Clona el repo, ejecuta `/setup` en Claude Code, y tienes el agente configurado y
 - **ORM**: Drizzle (lightweight, SQL-first)
 - **Embeddings**: Gemini `gemini-embedding-001` (768-dim, GOOGLE_API_KEY)
 - **LLM**: Gemini `gemini-2.5-flash` (configurable via GEMINI_MODEL)
+- **Auth**: Firebase ID tokens o password local (configurable via AUTH_STRATEGY)
 - **Streaming**: SSE via Hono
-- **Deploy local**: Docker Compose (postgres+pgvector + app)
-- **Deploy prod**: Railway (API) + Supabase (DB)
-
-## Comandos Claude Code
-
-| Comando | Cuándo usarlo |
-|---------|---------------|
-| `/setup` | Primera vez con un cliente. Configura nombre, caso de uso, idioma, web search. |
-| `/add-tool` | Añadir una integración nueva (REST API, DB, script, lógica interna). |
-| `/status` | Ver configuración activa, tools registradas y estado del servidor. |
-| `/ingest [path\|url]` | Ingestar un documento o URL en el vector store. |
-| `/test-rag [query]` | Probar el retrieval y ver los chunks recuperados con sus scores. |
-| `/tune-retrieval` | Diagnosticar problemas de calidad de retrieval y proponer ajustes. |
-| `/benchmark` | Ejecutar suite de benchmarks de retrieval. |
-
-## Flujo para un cliente nuevo
-
-```
-1. git clone rag-agent-backbone <nombre-proyecto>  &&  cd <nombre-proyecto>
-2. npm install
-3. /setup                    →  4 preguntas  →  archivos configurados
-4. cp .env.example .env      →  añade GOOGLE_API_KEY y las keys que /setup indique
-5. docker-compose up         →  PostgreSQL + pgvector
-6. npm run migrate           →  aplica schema
-7. npm run dev               →  servidor en :3000
-8. /ingest ./docs/           →  indexa los documentos del cliente
-9. POST /chat {"query":"..."}  →  prueba el agente
-```
-
-## Añadir una integración
-
-```
-/add-tool
-→ elige tipo: REST API / Base de datos / Script externo / Lógica interna
-→ responde las preguntas del tipo
-→ código generado + tsc validado
-```
+- **Deploy**: Railway (API) + Supabase (DB)
+- **Tests**: Vitest (unit + integration)
 
 ## Arquitectura (Clean / Hexagonal)
 
 ```
-Domain (entities, errors, ports)    ← cero dependencias externas
+Domain (entities, errors, ports)       ← cero dependencias externas
   ↑
-Application (managers / use cases)  ← solo importa de domain
+Application (managers / use cases)     ← solo importa de domain
   ↑
-Infrastructure (db, repositories)   ← implementa los ports
+Infrastructure (db, repos, auth)       ← implementa los ports
   ↑
-API (controllers, middleware)       ← orquesta application + infrastructure
+API (controllers, middleware)          ← orquesta application + infrastructure
+  ↑
+Plugins (rag, quote)                   ← extienden funcionalidad con agents, tools y routes
+  ↑
+Coordinator (agent principal)          ← orquesta plugins, punto de entrada del LLM
 ```
 
-## Estructura clave
+## Estructura del proyecto
 ```
-src/domain/entities/   → Interfaces puras de entidades (User, Document, Topic, etc.)
-src/domain/errors/     → DomainError + subclases (NotFoundError, ConflictError, etc.)
-src/domain/ports/      → Interfaces de repositorios (UserRepository, etc.)
-src/application/       → Managers / use cases (UserManager, DocumentManager, etc.)
-src/infrastructure/db/ → Drizzle schema, client, migrations, seed
-src/infrastructure/repositories/ → Implementaciones Drizzle de los ports
-src/api/               → Hono controllers, middleware, routes (chat, ingest, health)
-src/rag/               → interfaces.ts + adapters.ts + retriever + reranker + chunker
-src/agent/             → rag-agent.ts + workflow.ts
-src/agent/tools/       → tool factory pattern (ToolEntry)
-src/ingestion/         → Document ingestion (loader, processor)
-src/config/            → rag.config.ts + tools.config.ts
+src/
+├── index.ts                           → Composition root: repos, managers, plugins, server
+├── app.ts                             → Hono app factory: middleware, rutas, error handler
+├── config/
+│   └── auth.config.ts                 → Estrategia de auth (firebase | password)
+├── domain/
+│   ├── entities/index.ts              → Interfaces puras (User, Document, Topic, Conversation, Message, Chunk, WhatsAppSession)
+│   ├── errors/                        → DomainError + subclases (NotFound, Conflict, Unauthorized, Forbidden, Validation)
+│   └── ports/
+│       ├── auth-strategy.ts           → Interface AuthStrategy (verify, createUser)
+│       └── repositories/              → Interfaces de repos (User, Document, Conversation, Topic, WhatsAppSession)
+├── application/managers/
+│   ├── user.manager.ts                → Auth, registro, CRUD usuarios, roles
+│   ├── organization.manager.ts        → CRUD organizaciones, cascade delete
+│   ├── document.manager.ts            → Listado/borrado docs (scoped por orgId)
+│   ├── conversation.manager.ts        → CRUD conversaciones + resolveOrCreateByTitle
+│   ├── topic.manager.ts               → CRUD topics (por org), agrupación de documentos
+│   └── whatsapp.manager.ts            → Sesiones WhatsApp per-user, QR, status
+├── infrastructure/
+│   ├── db/
+│   │   ├── client.ts                  → Pool Drizzle + pgvector + auto-migrations en startup
+│   │   ├── schema.ts                  → Tablas: users, conversations, messages, topics, documents, document_chunks, whatsapp_sessions, catalogs, catalog_items
+│   │   ├── migrations/                → SQL migrations (drizzle-kit)
+│   │   ├── seed.ts                    → Seed de datos
+│   │   └── catalog-seed.ts            → Seed de catálogo (plugin quote)
+│   ├── repositories/                  → Implementaciones Drizzle de los ports
+│   │   ├── drizzle-user.repository.ts
+│   │   ├── drizzle-document.repository.ts
+│   │   ├── drizzle-conversation.repository.ts
+│   │   ├── drizzle-topic.repository.ts
+│   │   └── drizzle-whatsapp-session.repository.ts
+│   └── auth/
+│       ├── firebase.strategy.ts       → Verificación Firebase ID tokens
+│       └── strategy-factory.ts        → Factory: firebase | password
+├── api/
+│   ├── controllers/
+│   │   ├── auth.controller.ts         → POST /auth/register, /auth/login, GET /auth/me
+│   │   ├── admin.controller.ts        → /admin/users, /admin/organizations (admin-only)
+│   │   ├── internal.controller.ts     → /internal/whatsapp/* (worker auth)
+│   │   ├── channel.controller.ts      → /channels/whatsapp/* (user auth)
+│   │   ├── document.controller.ts     → GET /documents, DELETE /documents/:id
+│   │   ├── conversation.controller.ts → CRUD /conversations
+│   │   └── topic.controller.ts        → CRUD /topics, GET /topics/:id/documents
+│   ├── middleware/
+│   │   ├── auth.ts                    → authMiddleware (JWT/API-Key), requireRole, requireWorker, optionalAuth
+│   │   └── error-handler.middleware.ts → DomainError → HTTP status mapping
+│   ├── helpers/
+│   │   ├── extract-sources.ts         → Parse tool results para citas
+│   │   ├── format-whatsapp.ts         → Formateo texto WhatsApp
+│   │   └── persist-messages.ts        → Persistir conversaciones en DB
+│   └── health.ts                      → GET /health
+├── agent/
+│   └── coordinator.ts                 → Agente coordinador (Emilio): orquesta todos los plugins
+├── plugins/
+│   ├── plugin.interface.ts            → Contrato Plugin: id, name, agent?, tools, routes?, initialize?, shutdown?
+│   ├── plugin-registry.ts             → Registro y lifecycle de plugins
+│   ├── rag/                           → Plugin RAG
+│   │   ├── rag.plugin.ts             → Entry point del plugin
+│   │   ├── rag.agent.ts              → Agente RAG + tool registry
+│   │   ├── config/
+│   │   │   ├── rag.config.ts         → Config RAG (topK, threshold, chunking, etc.)
+│   │   │   └── tools.config.ts       → Flags enable/disable por tool
+│   │   ├── pipeline/
+│   │   │   ├── interfaces.ts         → Contratos del pipeline
+│   │   │   ├── adapters.ts           → Factories: embedder, retriever, reranker
+│   │   │   ├── embeddings.ts         → Wrapper Gemini/OpenAI
+│   │   │   ├── retriever.ts          → pgvector similarity search
+│   │   │   ├── reranker.ts           → Cohere reranking (opcional)
+│   │   │   ├── chunker.ts            → Estrategias de chunking
+│   │   │   ├── query-transformer.ts  → Multi-query, HyDE
+│   │   │   └── retrieval-pipeline.ts → Orquestador del pipeline
+│   │   ├── tools/
+│   │   │   ├── base.ts               → Tool factory pattern
+│   │   │   ├── search-documents.ts   → Búsqueda RAG en documentos
+│   │   │   ├── save-note.ts          → Persistir documentos
+│   │   │   ├── search-web.ts         → Fallback web (Perplexity)
+│   │   │   └── index.ts              → Tool registry
+│   │   ├── routes/
+│   │   │   ├── chat.routes.ts        → POST /chat (SSE streaming)
+│   │   │   └── ingest.routes.ts      → POST /ingest
+│   │   └── ingestion/
+│   │       ├── loader.ts             → Carga archivos/URLs
+│   │       ├── processor.ts          → Chunking + embedding
+│   │       ├── enricher.ts           → Enriquecimiento de metadata
+│   │       ├── contextualizer.ts     → Prefijos de contexto
+│   │       ├── watcher.ts            → File system monitoring
+│   │       ├── cli.ts                → Ingesta por CLI
+│   │       └── loaders/youtube.ts    → YouTube loader
+│   └── quote/                         → Plugin de presupuestos
+│       ├── quote.plugin.ts           → Entry point
+│       ├── quote.agent.ts            → Agente de presupuestos
+│       ├── config/quote.config.ts    → Config del plugin
+│       ├── tools/calculate-budget.tool.ts → Cálculo + generación PDF
+│       └── services/
+│           ├── catalog.service.ts    → Lookup de catálogo
+│           └── pdf.service.ts        → Generación PDF (pdf-lib)
+└── __tests__/
+    ├── unit/                          → Tests de managers
+    ├── integration/                   → Tests de controllers
+    └── helpers/
+        ├── mock-repos.ts             → Mock repositories
+        └── test-app.ts               → App factory para tests
 ```
 
 ## Convenciones
-- Toda la config vive en `src/config/` — generada y modificada por los comandos Claude Code
-- Añadir una tool = crear `src/agent/tools/my-tool.ts` + una línea en `tools/index.ts` + una línea en `tools.config.ts`
-- Cambiar embedder/retriever/reranker = solo modificar `src/rag/adapters.ts`
+
+### Arquitectura
+- **Domain**: cero imports de infrastructure. Interfaces puras en `entities/`, ports en `ports/`
+- **Application**: managers solo importan de domain. Lógica de negocio aquí
+- **Infrastructure**: implementa ports. Drizzle, Firebase, repos concretos
+- **API**: controllers delgados — validan con Zod, delegan en managers, devuelven respuesta
+- **Plugins**: encapsulan agent + tools + routes. Se registran en `plugin-registry.ts`
+
+### Código
 - Secrets siempre en `.env`, nunca hardcoded — usar `process.env["VAR"]` (con corchetes)
-- Local ↔ Producción: mismo código, solo variables de entorno cambian
-- **Error responses**: `{ error: "Category", message: "detail" }` (e.g. `{ error: "NotFound", message: "User 'abc' not found" }`)
-- **Domain entities**: definir en `src/domain/entities/` — domain y application NUNCA importan de infrastructure
-- **Repository pattern**: interfaces en `src/domain/ports/repositories/`, implementaciones en `src/infrastructure/repositories/`
+- Error responses: `{ error: "Category", message: "detail" }`
+- Validar siempre con Zod antes de procesar cualquier input
+- UUIDs con `defaultRandom()` para PKs. No auto-increment
+- Timestamps siempre `withTimezone: true`, almacenar UTC
+
+### Plugins
+- Cada plugin implementa `Plugin` interface de `plugin.interface.ts`
+- Añadir plugin = crear carpeta en `src/plugins/`, registrar en `index.ts`
+- Plugin owning: agent, tools, routes, config — todo encapsulado
+- El coordinator agrega tools de todos los plugins registrados
+
+### Multi-tenancy
+- `orgId` es string libre (no FK) para aislamiento de datos
+- WhatsApp sessions son per-user (no per-org), orgId denormalizado
+- Documentos, topics, conversaciones: scoped por orgId
+- Cascade delete: borrar org → borra users → cascade a sessions, conversations
+
+### Testing
+- Unit tests: mockear repos con `mock-repos.ts`, testear managers
+- Integration tests: usar `test-app.ts` para crear app con mocks, testear controllers
+- Nombrar: `*.test.ts` en `__tests__/unit/` o `__tests__/integration/`
 
 ## Comandos npm
 ```bash
-npm run dev          # Development con hot reload
-npm run build        # Build producción
-npm run migrate      # Aplicar migraciones Drizzle
-npm run seed         # Datos de prueba
-npm run ingest       # Ingestar documentos desde CLI
-docker-compose up    # Stack local completo
+npm run dev               # Development con hot reload (tsx watch)
+npm run build             # tsc --noEmit + esbuild → dist/index.js
+npm run start             # Ejecutar build compilado
+npm run migrate           # Aplicar migraciones Drizzle
+npm run migrate:generate  # Generar migración desde cambios en schema
+npm run seed              # Datos de prueba
+npm run ingest            # Ingestar documentos (CLI)
+npm run ingest:youtube    # Ingestar desde YouTube
+npm run typecheck         # tsc --noEmit
+npm run lint              # ESLint
+npm run test              # Vitest (todos)
+npm run test:unit         # Solo unit tests
+npm run test:integration  # Solo integration tests
+docker-compose up         # Stack local (postgres + app)
 ```
 
-## Variables de entorno requeridas
+## Variables de entorno
 Ver `.env.example` para la lista completa.
-Mínimo para local: `DATABASE_URL` + `GOOGLE_API_KEY`
-Mínimo para prod: `DATABASE_URL` + `GOOGLE_API_KEY` (+ `PERPLEXITY_API_KEY` si web search activo)
 
-## Setup inicial
-Ejecuta `/setup` en Claude Code. Te hará 4 preguntas y actualizará directamente:
-- `src/config/rag.config.ts`
-- `src/config/tools.config.ts`
-- `.env.example`
-- `CLAUDE.md` (sección Propósito)
-- `setup-responses.md` (memoria del wizard para futuras sesiones)
+**Requeridas:**
+- `DATABASE_URL` — PostgreSQL con pgvector
+- `GOOGLE_API_KEY` — Gemini embeddings + LLM
+
+**Auth:**
+- `JWT_SECRET` — Firma de tokens
+- `AUTH_STRATEGY` — `password` (default) o `firebase`
+- `FIREBASE_PROJECT_ID` — Requerido si AUTH_STRATEGY=firebase
+- `API_KEY` — Auth por API-Key (machine-to-machine)
+
+**Opcionales:**
+- `GEMINI_MODEL` — default: gemini-2.5-flash
+- `PERPLEXITY_API_KEY` — Web search fallback
+- `COHERE_API_KEY` — Reranking
+- `YOUTUBE_API_KEY` — Ingesta YouTube
+- `ALLOWED_ORIGINS` — CORS (comma-separated)
+
+## Endpoints principales
+
+| Grupo | Ruta | Auth | Propósito |
+|-------|------|------|-----------|
+| Auth | `POST /auth/register` | opcional | Registro (primer user = admin) |
+| Auth | `POST /auth/login` | - | Login → JWT |
+| Auth | `GET /auth/me` | user | Info usuario actual |
+| Admin | `/admin/users/*` | admin | CRUD usuarios |
+| Admin | `/admin/organizations/*` | admin | CRUD organizaciones |
+| Chat | `POST /chat` | user | Query al agente (SSE streaming) |
+| Ingest | `POST /ingest` | user | Ingestar documentos |
+| Docs | `GET/DELETE /documents` | user | Gestión documentos |
+| Topics | `CRUD /topics` | user | Gestión topics |
+| Conversations | `CRUD /conversations` | user | Gestión conversaciones |
+| WhatsApp | `/channels/whatsapp/*` | user | Estado/QR sesión WhatsApp |
+| Internal | `/internal/whatsapp/*` | worker | Worker ↔ backbone protocol |
+| Health | `GET /health` | - | Health check |
+
+## Deploy
+- **Railway**: detecta Dockerfile automáticamente, deploy on push a `main`
+- **DB**: Supabase PostgreSQL con pgvector habilitado
+- Las migraciones se ejecutan automáticamente en startup (`client.ts`)
+- Remotes: `origin` = agent-grass, `backbone` = template (para sync futuro)
