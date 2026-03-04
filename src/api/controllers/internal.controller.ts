@@ -166,16 +166,32 @@ export function createInternalController(
         memory: { thread: conversationId, resource: orgId },
       });
 
+      const replyText = result.text?.trim();
+      if (!replyText) {
+        console.error("[internal/message] agent returned empty response", {
+          userId,
+          steps: result.steps?.length ?? 0,
+        });
+        return c.json({
+          data: { reply: "Lo siento, no pude procesar tu solicitud. Por favor, inténtalo de nuevo." },
+        });
+      }
+
       const steps = unwrapDelegationSteps(result.steps ?? []);
       const sources = extractSources(steps);
       const pdfAttachment = extractPdfFromSteps(steps);
 
-      await persistMessages(conversationId, messageBody, result.text, {
-        model: ragConfig.llmModel,
-        retrievedChunks: sources.map((s) => s.id),
-      });
+      // Persist messages separately — don't let a DB error kill the reply
+      try {
+        await persistMessages(conversationId, messageBody, replyText, {
+          model: ragConfig.llmModel,
+          retrievedChunks: sources.map((s) => s.id),
+        });
+      } catch (persistError) {
+        console.error("[internal/message] failed to persist messages:", persistError);
+      }
 
-      const waText = formatForWhatsApp(result.text) + buildSourcesFooter(sources);
+      const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
       return c.json({
         data: {

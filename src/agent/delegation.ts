@@ -23,15 +23,27 @@ function createDelegationTool(plugin: Plugin) {
       ].filter(Boolean).join("");
       const enriched = tags ? `${query}\n${tags}` : query;
 
-      // Generate WITHOUT memory — the coordinator already manages conversation memory.
-      const result = await plugin.agent.generate(enriched);
+      try {
+        // Generate WITHOUT memory — the coordinator already manages conversation memory.
+        const result = await plugin.agent.generate(enriched);
 
-      // Pass through toolResults so extractSources() and extractPdfFromSteps() keep working.
-      const toolResults = result.steps?.flatMap(
-        (s: { toolResults?: Array<unknown> }) => s.toolResults ?? []
-      ) ?? [];
+        if (!result.text?.trim()) {
+          console.error(`[delegation] ${plugin.id} returned empty response`, {
+            steps: result.steps?.length ?? 0,
+          });
+          return { text: `Error: ${plugin.name} no pudo procesar la solicitud. Inténtalo de nuevo.`, toolResults: [] };
+        }
 
-      return { text: result.text, toolResults };
+        // Pass through toolResults so extractSources() and extractPdfFromSteps() keep working.
+        const toolResults = result.steps?.flatMap(
+          (s: { toolResults?: Array<unknown> }) => s.toolResults ?? []
+        ) ?? [];
+
+        return { text: result.text, toolResults };
+      } catch (error) {
+        console.error(`[delegation] ${plugin.id} error:`, error);
+        return { text: `Error al delegar a ${plugin.name}: ${error instanceof Error ? error.message : "error desconocido"}`, toolResults: [] };
+      }
     },
   });
 }
