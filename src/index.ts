@@ -21,6 +21,10 @@ import { OrganizationManager } from "./application/managers/organization.manager
 import { PluginRegistry } from "./plugins/plugin-registry.js";
 import { RagPlugin } from "./plugins/rag/index.js";
 import { QuotePlugin } from "./plugins/quote/index.js";
+import { YouTubePlugin } from "./plugins/youtube/index.js";
+import { GmailPlugin } from "./plugins/gmail/index.js";
+import { CalendarPlugin } from "./plugins/calendar/index.js";
+import { StubOAuthProvider } from "./plugins/google-common/index.js";
 
 // Coordinator agent
 import { createCoordinatorAgent } from "./agent/coordinator.js";
@@ -63,6 +67,12 @@ const pluginRegistry = new PluginRegistry();
 const ragPlugin = new RagPlugin();
 pluginRegistry.register(ragPlugin);
 pluginRegistry.register(new QuotePlugin());
+pluginRegistry.register(new YouTubePlugin());
+
+const oauthProvider = new StubOAuthProvider();
+// FUTURO: const oauthProvider = new OAuthManagerAdapter(oAuthManager);
+pluginRegistry.register(new GmailPlugin(oauthProvider));
+pluginRegistry.register(new CalendarPlugin(oauthProvider));
 
 // 4. Coordinator agent (uses all plugin tools)
 const coordinatorAgent = createCoordinatorAgent(pluginRegistry);
