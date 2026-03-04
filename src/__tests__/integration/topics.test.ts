@@ -7,10 +7,6 @@ vi.mock("../../infrastructure/db/client.js", () => ({
   runMigrations: vi.fn(),
 }));
 
-vi.mock("../../api/helpers/persist-messages.js", () => ({
-  persistMessages: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { createTestApp, createAuthHeaders, type TestContext } from "../helpers/test-app.js";
 import { fakeTopic, fakeDocument } from "../helpers/mock-repos.js";
 
@@ -53,9 +49,8 @@ describe("Topics API", () => {
   });
 
   it("POST /topics returns 409 on duplicate name", async () => {
-    const dbError = new Error("duplicate key");
-    (dbError as unknown as Record<string, unknown>).cause = { code: "23505" };
-    ctx.repos.topic.create.mockRejectedValue(dbError);
+    const { ConflictError } = await import("../../domain/errors/index.js");
+    ctx.repos.topic.create.mockRejectedValue(new ConflictError("Topic", "name 'Existing'"));
 
     const res = await ctx.app.request("/topics", {
       method: "POST",

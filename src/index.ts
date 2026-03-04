@@ -57,6 +57,7 @@ const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, session
 // 3. Plugin registry
 const pluginRegistry = new PluginRegistry();
 const ragPlugin = new RagPlugin();
+ragPlugin.setConversationManager(convManager);
 pluginRegistry.register(ragPlugin);
 
 // 4. Coordinator agent (uses all plugin tools)

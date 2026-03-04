@@ -2,6 +2,7 @@ import type { Conversation } from "../../domain/entities/index.js";
 import type {
   ConversationRepository,
   ConversationWithMessages,
+  PersistMessagesData,
 } from "../../domain/ports/repositories/conversation.repository.js";
 import { NotFoundError } from "../../domain/errors/index.js";
 
@@ -42,5 +43,14 @@ export class ConversationManager {
 
     const conv = await this.repo.create({ title, userId });
     return conv.id;
+  }
+
+  async persistMessages(
+    conversationId: string,
+    userMessage: string,
+    assistantMessage: string,
+    metadata: PersistMessagesData["metadata"],
+  ): Promise<void> {
+    await this.repo.persistMessages({ conversationId, userMessage, assistantMessage, metadata });
   }
 }

@@ -4,7 +4,6 @@ import type { Agent } from "@mastra/core/agent";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
 import type { ConversationManager } from "../../application/managers/conversation.manager.js";
 import { extractSources } from "../helpers/extract-sources.js";
-import { persistMessages } from "../helpers/persist-messages.js";
 import { formatForWhatsApp, buildSourcesFooter } from "../helpers/format-whatsapp.js";
 import { ragConfig } from "../../plugins/rag/config/rag.config.js";
 import { RequestContext } from "@mastra/core/request-context";
@@ -167,7 +166,7 @@ export function createInternalController(
       const sources = extractSources(steps);
       const pdfAttachment = extractPdfFromSteps(steps);
 
-      await persistMessages(conversationId, messageBody, result.text, {
+      await convManager.persistMessages(conversationId, messageBody, result.text, {
         model: ragConfig.llmModel,
         retrievedChunks: sources.map((s) => s.id),
       });
