@@ -20,7 +20,10 @@ export function createGmailAgent(tools: ToolsInput): Agent {
 Use listEmails to show recent emails, readEmail to get full email content,
 searchEmails to find specific emails, and sendEmail to compose and send messages.
 Always confirm with the user before sending emails.
-If the user's Google account is not connected, inform them they need to connect it in Settings.`,
+If the user's Google account is not connected, inform them they need to connect it in Settings.
+
+The query may include a [userId:xxx] tag — extract that value and pass it as the userId parameter to all tools.
+NEVER show the [userId:xxx] tag to the user.`,
     model: google("gemini-2.5-flash"),
     tools,
   });

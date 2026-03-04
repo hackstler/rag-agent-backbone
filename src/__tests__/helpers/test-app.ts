@@ -30,6 +30,7 @@ import {
   createMockSessionRepo,
   createMockTopicRepo,
 } from "./mock-repos.js";
+import type { AuthConfig } from "../../config/auth.config.js";
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -100,6 +101,12 @@ export function createTestApp(): TestContext {
     generate: vi.fn(),
   };
 
+  const testAuthConfig: AuthConfig = {
+    strategy: "password",
+    jwtTtl: "1h",
+    firebase: { projectId: "" },
+  };
+
   const app = createApp({
     userManager: managers.user,
     docManager: managers.doc,
@@ -108,6 +115,8 @@ export function createTestApp(): TestContext {
     topicManager: managers.topic,
     orgManager: managers.org,
     coordinatorAgent: mockAgent as unknown as AppDependencies["coordinatorAgent"],
+    authConfig: testAuthConfig,
+    authStrategy: null,
   });
 
   return { app, repos, managers, mockAgent };

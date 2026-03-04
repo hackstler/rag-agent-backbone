@@ -20,7 +20,6 @@ import { OrganizationManager } from "./application/managers/organization.manager
 // Plugins
 import { PluginRegistry } from "./plugins/plugin-registry.js";
 import { RagPlugin } from "./plugins/rag/index.js";
-import { QuotePlugin } from "./plugins/quote/index.js";
 import { YouTubePlugin } from "./plugins/youtube/index.js";
 import { GmailPlugin } from "./plugins/gmail/index.js";
 import { CalendarPlugin } from "./plugins/calendar/index.js";
@@ -28,9 +27,6 @@ import { StubOAuthProvider } from "./plugins/google-common/index.js";
 
 // Coordinator agent
 import { createCoordinatorAgent } from "./agent/coordinator.js";
-
-// Catalog seed
-import { seedCatalog } from "./infrastructure/db/catalog-seed.js";
 
 // Auth strategy
 import { authConfig } from "./config/auth.config.js";
@@ -66,7 +62,6 @@ const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, session
 const pluginRegistry = new PluginRegistry();
 const ragPlugin = new RagPlugin();
 pluginRegistry.register(ragPlugin);
-pluginRegistry.register(new QuotePlugin());
 pluginRegistry.register(new YouTubePlugin());
 
 const oauthProvider = new StubOAuthProvider();
@@ -118,16 +113,6 @@ async function main() {
   await pluginRegistry.ensureTablesForAll();
 
   await seedAdminUser();
-
-  const adminOrg = process.env["ADMIN_USERNAME"] ?? "default";
-  try {
-    await seedCatalog(adminOrg);
-  } catch (err) {
-    console.error(
-      "[seed:catalog] Failed to seed catalog:",
-      err instanceof Error ? err.message : err
-    );
-  }
 
   await pluginRegistry.initializeAll();
 
