@@ -13,13 +13,13 @@ function createDelegationTool(plugin: Plugin) {
     description: `Delegate to ${plugin.name}: ${plugin.description}`,
     inputSchema: z.object({
       query: z.string().describe("The user query or instruction to delegate"),
-      orgId: z.string().describe("Organization ID for multi-tenant context"),
     }),
-    execute: async ({ query, orgId }) => {
-      const enriched = `${query}\n[org:${orgId}]`;
-
+    execute: async ({ query }, context) => {
       // Generate WITHOUT memory — the coordinator already manages conversation memory.
-      const result = await plugin.agent.generate(enriched);
+      // Forward requestContext so sub-agent tools can access userId/orgId.
+      const result = await plugin.agent.generate(query, {
+        ...(context?.requestContext && { requestContext: context.requestContext }),
+      });
 
       // Pass through toolResults so extractSources() and extractPdfFromSteps() keep working.
       const toolResults = result.steps?.flatMap(

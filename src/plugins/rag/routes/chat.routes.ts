@@ -8,6 +8,7 @@ import { db } from "../../../infrastructure/db/client.js";
 import { conversations } from "../../../infrastructure/db/schema.js";
 import { extractSources } from "../../../api/helpers/extract-sources.js";
 import { persistMessages } from "../../../api/helpers/persist-messages.js";
+import { RequestContext } from "@mastra/core/request-context";
 
 const chatSchema = z.object({
   query: z.string().min(1).max(10_000),
@@ -36,9 +37,13 @@ export function createChatRoutes(agent: Agent): Hono {
     const { query } = parsed.data;
     const orgId = c.get("user")?.orgId;
     if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
+    const userId = c.get("user")?.userId;
     const conversationId = await resolveConversationId(parsed.data.conversationId);
 
+    const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
+
     const result = await agent.generate(query, {
+      requestContext,
       memory: { thread: conversationId, resource: orgId },
     });
 
@@ -68,6 +73,7 @@ export function createChatRoutes(agent: Agent): Hono {
     const queryParam = c.req.query("query");
     const conversationIdParam = c.req.query("conversationId");
     const orgId = c.get("user")?.orgId;
+    const userId = c.get("user")?.userId;
 
     if (!orgId) return c.json({ error: "Unauthorized", message: "Missing orgId" }, 401);
 
@@ -97,7 +103,10 @@ export function createChatRoutes(agent: Agent): Hono {
       const collectedSources: Array<{ id: string; documentTitle: string; documentSource: string; score: number; excerpt: string }> = [];
 
       try {
+        const requestContext = new RequestContext([['userId', userId ?? 'anonymous'], ['orgId', orgId]]);
+
         const agentStream = await agent.stream(parsed.data.query, {
+          requestContext,
           memory: { thread: conversationId, resource: orgId },
         });
 
