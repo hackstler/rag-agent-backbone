@@ -5,15 +5,18 @@ import {
   createMockDocumentRepo,
   createMockTopicRepo,
   createMockSessionRepo,
+  createMockOrgRepo,
   fakeUser,
+  fakeOrganization,
 } from "../helpers/mock-repos.js";
-import { NotFoundError, ConflictError, ValidationError } from "../../domain/errors/index.js";
+import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from "../../domain/errors/index.js";
 
 describe("OrganizationManager", () => {
   let userRepo: ReturnType<typeof createMockUserRepo>;
   let docRepo: ReturnType<typeof createMockDocumentRepo>;
   let topicRepo: ReturnType<typeof createMockTopicRepo>;
   let sessionRepo: ReturnType<typeof createMockSessionRepo>;
+  let orgRepo: ReturnType<typeof createMockOrgRepo>;
   let manager: OrganizationManager;
   const passwordSalt = "test-salt";
 
@@ -22,7 +25,8 @@ describe("OrganizationManager", () => {
     docRepo = createMockDocumentRepo();
     topicRepo = createMockTopicRepo();
     sessionRepo = createMockSessionRepo();
-    manager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, passwordSalt);
+    orgRepo = createMockOrgRepo();
+    manager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, passwordSalt);
   });
 
   // ── list ───────────────────────────────────────────────────────────────────
@@ -51,6 +55,48 @@ describe("OrganizationManager", () => {
     });
   });
 
+  // ── getByOrgId ──────────────────────────────────────────────────────────────
+
+  describe("getByOrgId(orgId)", () => {
+    it("returns the organization when found", async () => {
+      const org = fakeOrganization({ orgId: "org-1", name: "Acme" });
+      orgRepo.findByOrgId.mockResolvedValue(org);
+
+      const result = await manager.getByOrgId("org-1");
+
+      expect(orgRepo.findByOrgId).toHaveBeenCalledWith("org-1");
+      expect(result).toEqual(org);
+    });
+
+    it("throws NotFoundError when org does not exist", async () => {
+      orgRepo.findByOrgId.mockResolvedValue(null);
+
+      await expect(manager.getByOrgId("org-ghost")).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  // ── update ──────────────────────────────────────────────────────────────────
+
+  describe("update(orgId, callerOrgId, data)", () => {
+    it("updates the organization when caller owns it", async () => {
+      const updated = fakeOrganization({ orgId: "org-1", name: "Acme Updated" });
+      orgRepo.update.mockResolvedValue(updated);
+
+      const result = await manager.update("org-1", "org-1", { name: "Acme Updated" });
+
+      expect(orgRepo.update).toHaveBeenCalledWith("org-1", { name: "Acme Updated" });
+      expect(result.name).toBe("Acme Updated");
+    });
+
+    it("throws ForbiddenError when caller does not own the org", async () => {
+      await expect(
+        manager.update("org-1", "org-other", { name: "Hacked" }),
+      ).rejects.toThrow(ForbiddenError);
+
+      expect(orgRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
   // ── create ─────────────────────────────────────────────────────────────────
 
   describe("create(dto)", () => {
@@ -60,9 +106,10 @@ describe("OrganizationManager", () => {
       adminPassword: "secret123",
     };
 
-    it("creates the org admin and returns result on success", async () => {
+    it("creates the org admin and organization row, returns result on success", async () => {
       userRepo.findFirstByOrg.mockResolvedValue(null);
       userRepo.findByEmail.mockResolvedValue(null);
+      orgRepo.create.mockResolvedValue(fakeOrganization({ orgId: "org-new" }));
       const createdUser = fakeUser({
         id: "u-new",
         email: "admin@new.com",
@@ -77,6 +124,18 @@ describe("OrganizationManager", () => {
 
       expect(userRepo.findFirstByOrg).toHaveBeenCalledWith("org-new");
       expect(userRepo.findByEmail).toHaveBeenCalledWith("admin@new.com");
+      expect(orgRepo.create).toHaveBeenCalledWith({
+        orgId: "org-new",
+        slug: undefined,
+        name: undefined,
+        address: undefined,
+        phone: undefined,
+        email: undefined,
+        nif: undefined,
+        logo: undefined,
+        vatRate: undefined,
+        currency: undefined,
+      });
       expect(userRepo.create).toHaveBeenCalled();
       expect(result.orgId).toBe("org-new");
       expect(result.admin).toMatchObject({
@@ -85,6 +144,28 @@ describe("OrganizationManager", () => {
         orgId: "org-new",
         role: "admin",
       });
+    });
+
+    it("passes optional org fields to orgRepo.create", async () => {
+      userRepo.findFirstByOrg.mockResolvedValue(null);
+      userRepo.findByEmail.mockResolvedValue(null);
+      orgRepo.create.mockResolvedValue(fakeOrganization({ orgId: "org-new", name: "Acme", slug: "acme" }));
+      userRepo.create.mockResolvedValue(fakeUser({ orgId: "org-new" }));
+
+      await manager.create({
+        ...dto,
+        slug: "acme",
+        name: "Acme",
+        vatRate: "0.2100",
+      });
+
+      expect(orgRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: "acme",
+          name: "Acme",
+          vatRate: "0.2100",
+        }),
+      );
     });
 
     it("throws ConflictError when org already exists", async () => {
@@ -104,12 +185,13 @@ describe("OrganizationManager", () => {
   // ── delete ─────────────────────────────────────────────────────────────────
 
   describe("delete(orgId, callerOrgId)", () => {
-    it("cascade-deletes all org resources when org exists", async () => {
+    it("cascade-deletes all org resources including organizations row", async () => {
       userRepo.findFirstByOrg.mockResolvedValue(fakeUser({ orgId: "org-target" }));
       docRepo.deleteByOrg.mockResolvedValue(undefined);
       topicRepo.deleteByOrg.mockResolvedValue(undefined);
       sessionRepo.deleteByOrgId.mockResolvedValue(undefined);
       userRepo.deleteByOrg.mockResolvedValue(undefined);
+      orgRepo.deleteByOrgId.mockResolvedValue(undefined);
 
       await expect(manager.delete("org-target", "org-caller")).resolves.toBeUndefined();
 
@@ -117,6 +199,7 @@ describe("OrganizationManager", () => {
       expect(topicRepo.deleteByOrg).toHaveBeenCalledWith("org-target");
       expect(sessionRepo.deleteByOrgId).toHaveBeenCalledWith("org-target");
       expect(userRepo.deleteByOrg).toHaveBeenCalledWith("org-target");
+      expect(orgRepo.deleteByOrgId).toHaveBeenCalledWith("org-target");
     });
 
     it("throws ValidationError when trying to delete own org", async () => {

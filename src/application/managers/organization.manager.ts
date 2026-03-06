@@ -3,7 +3,9 @@ import type { UserRepository } from "../../domain/ports/repositories/user.reposi
 import type { DocumentRepository } from "../../domain/ports/repositories/document.repository.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
-import { NotFoundError, ConflictError, ValidationError } from "../../domain/errors/index.js";
+import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
+import type { Organization } from "../../domain/entities/index.js";
+import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from "../../domain/errors/index.js";
 
 export interface OrgSummary {
   orgId: string;
@@ -16,6 +18,28 @@ export interface CreateOrgDto {
   orgId: string;
   adminUsername: string;
   adminPassword: string;
+  slug?: string | null | undefined;
+  name?: string | null | undefined;
+  address?: string | null | undefined;
+  phone?: string | null | undefined;
+  email?: string | null | undefined;
+  nif?: string | null | undefined;
+  logo?: string | null | undefined;
+  vatRate?: string | null | undefined;
+  currency?: string | undefined;
+}
+
+export interface UpdateOrgDto {
+  slug?: string | null | undefined;
+  name?: string | null | undefined;
+  address?: string | null | undefined;
+  phone?: string | null | undefined;
+  email?: string | null | undefined;
+  nif?: string | null | undefined;
+  logo?: string | null | undefined;
+  vatRate?: string | null | undefined;
+  currency?: string | undefined;
+  metadata?: Record<string, unknown> | null | undefined;
 }
 
 export class OrganizationManager {
@@ -24,6 +48,7 @@ export class OrganizationManager {
     private readonly docRepo: DocumentRepository,
     private readonly topicRepo: TopicRepository,
     private readonly sessionRepo: WhatsAppSessionRepository,
+    private readonly orgRepo: OrganizationRepository,
     private readonly passwordSalt: string,
   ) {}
 
@@ -45,12 +70,39 @@ export class OrganizationManager {
     }));
   }
 
+  async getByOrgId(orgId: string): Promise<Organization> {
+    const org = await this.orgRepo.findByOrgId(orgId);
+    if (!org) throw new NotFoundError("Organization", orgId);
+    return org;
+  }
+
+  async update(orgId: string, callerOrgId: string, data: UpdateOrgDto): Promise<Organization> {
+    if (callerOrgId !== orgId) {
+      throw new ForbiddenError("Cannot update another organization");
+    }
+    return this.orgRepo.update(orgId, data);
+  }
+
   async create(dto: CreateOrgDto): Promise<{ orgId: string; admin: Record<string, unknown> }> {
     const existingOrg = await this.userRepo.findFirstByOrg(dto.orgId);
     if (existingOrg) throw new ConflictError("Organization", `orgId '${dto.orgId}'`);
 
     const existingUser = await this.userRepo.findByEmail(dto.adminUsername);
     if (existingUser) throw new ConflictError("User", `email '${dto.adminUsername}'`);
+
+    // Create the organizations row
+    await this.orgRepo.create({
+      orgId: dto.orgId,
+      slug: dto.slug,
+      name: dto.name,
+      address: dto.address,
+      phone: dto.phone,
+      email: dto.email,
+      nif: dto.nif,
+      logo: dto.logo,
+      vatRate: dto.vatRate,
+      currency: dto.currency,
+    });
 
     const admin = await this.userRepo.create({
       email: dto.adminUsername,
@@ -84,5 +136,6 @@ export class OrganizationManager {
     await this.topicRepo.deleteByOrg(orgId);
     await this.sessionRepo.deleteByOrgId(orgId);
     await this.userRepo.deleteByOrg(orgId);
+    await this.orgRepo.deleteByOrgId(orgId);
   }
 }

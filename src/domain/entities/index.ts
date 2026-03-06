@@ -155,6 +155,42 @@ export interface DocumentChunk {
   createdAt: Date;
 }
 
+// ── Organization ─────────────────────────────────────────────────────────────
+
+export interface Organization {
+  id: string;
+  orgId: string;
+  slug: string | null;
+  name: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  nif: string | null;
+  logo: string | null;
+  vatRate: string | null;
+  currency: string;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewOrganization {
+  id?: string | undefined;
+  orgId: string;
+  slug?: string | null | undefined;
+  name?: string | null | undefined;
+  address?: string | null | undefined;
+  phone?: string | null | undefined;
+  email?: string | null | undefined;
+  nif?: string | null | undefined;
+  logo?: string | null | undefined;
+  vatRate?: string | null | undefined;
+  currency?: string | undefined;
+  metadata?: Record<string, unknown> | null | undefined;
+  createdAt?: Date | undefined;
+  updatedAt?: Date | undefined;
+}
+
 // ── WhatsApp Session ────────────────────────────────────────────────────────────
 
 export interface WhatsappSession {

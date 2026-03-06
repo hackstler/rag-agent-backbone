@@ -27,6 +27,28 @@ const createOrgValidator = z.object({
   orgId: z.string().min(1).max(100),
   adminUsername: z.string().min(3).max(50),
   adminPassword: z.string().min(8),
+  slug: z.string().regex(/^[a-z0-9-]+$/).min(2).max(50).optional(),
+  name: z.string().max(200).optional(),
+  address: z.string().max(500).optional(),
+  phone: z.string().max(50).optional(),
+  email: z.string().email().max(255).optional(),
+  nif: z.string().max(50).optional(),
+  logo: z.string().max(2_000_000).optional(),
+  vatRate: z.number().min(0).max(1).optional(),
+  currency: z.string().max(10).optional(),
+});
+
+const updateOrgValidator = z.object({
+  slug: z.string().regex(/^[a-z0-9-]+$/).min(2).max(50).optional().nullable(),
+  name: z.string().max(200).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  email: z.string().email().max(255).optional().nullable(),
+  nif: z.string().max(50).optional().nullable(),
+  logo: z.string().max(2_000_000).optional().nullable(),
+  vatRate: z.number().min(0).max(1).optional().nullable(),
+  currency: z.string().max(10).optional(),
+  metadata: z.record(z.unknown()).optional().nullable(),
 });
 
 export function createAdminController(
@@ -83,14 +105,41 @@ export function createAdminController(
     return c.json({ items });
   });
 
+  router.get("/organizations/:orgId", async (c) => {
+    const orgId = c.req.param("orgId");
+    const org = await orgManager.getByOrgId(orgId);
+    return c.json(org);
+  });
+
   router.post("/organizations", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = createOrgValidator.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
     }
-    const result = await orgManager.create(parsed.data);
+    const { vatRate, ...rest } = parsed.data;
+    const result = await orgManager.create({
+      ...rest,
+      vatRate: vatRate != null ? String(vatRate) : undefined,
+    });
     return c.json(result, 201);
+  });
+
+  router.put("/organizations/:orgId", async (c) => {
+    const orgId = c.req.param("orgId");
+    const caller = c.get("user") as TokenPayload;
+    const body = await c.req.json().catch(() => null);
+    const parsed = updateOrgValidator.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
+    }
+    const { vatRate, ...rest } = parsed.data;
+    const data = {
+      ...rest,
+      ...(vatRate !== undefined ? { vatRate: vatRate != null ? String(vatRate) : null } : {}),
+    };
+    const org = await orgManager.update(orgId, caller.orgId, data);
+    return c.json(org);
   });
 
   router.delete("/organizations/:orgId", async (c) => {

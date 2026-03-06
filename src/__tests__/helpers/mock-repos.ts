@@ -4,7 +4,8 @@ import type { DocumentRepository } from "../../domain/ports/repositories/documen
 import type { ConversationRepository } from "../../domain/ports/repositories/conversation.repository.js";
 import type { TopicRepository } from "../../domain/ports/repositories/topic.repository.js";
 import type { WhatsAppSessionRepository } from "../../domain/ports/repositories/whatsapp-session.repository.js";
-import type { User, Conversation, Document, Topic, WhatsappSession } from "../../domain/entities/index.js";
+import type { OrganizationRepository } from "../../domain/ports/repositories/organization.repository.js";
+import type { User, Conversation, Document, Topic, WhatsappSession, Organization } from "../../domain/entities/index.js";
 
 // ── Mock repository factories ────────────────────────────────────────────────
 
@@ -82,6 +83,17 @@ export function createMockSessionRepo(): {
   };
 }
 
+export function createMockOrgRepo(): {
+  [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
+} {
+  return {
+    findByOrgId: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    deleteByOrgId: vi.fn(),
+  };
+}
+
 // ── Fake entity factories ────────────────────────────────────────────────────
 
 export function fakeUser(overrides: Partial<User> = {}): User {
@@ -132,6 +144,26 @@ export function fakeTopic(overrides: Partial<Topic> = {}): Topic {
     name: "General",
     description: null,
     createdAt: new Date("2025-01-01"),
+    ...overrides,
+  };
+}
+
+export function fakeOrganization(overrides: Partial<Organization> = {}): Organization {
+  return {
+    id: "org-uuid-1",
+    orgId: "org-1",
+    slug: null,
+    name: null,
+    address: null,
+    phone: null,
+    email: null,
+    nif: null,
+    logo: null,
+    vatRate: null,
+    currency: "€",
+    metadata: null,
+    createdAt: new Date("2025-01-01"),
+    updatedAt: new Date("2025-01-01"),
     ...overrides,
   };
 }

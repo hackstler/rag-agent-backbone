@@ -61,6 +61,23 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const organizations = pgTable("organizations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: text("org_id").notNull().unique(),
+  slug: text("slug").unique(),
+  name: text("name"),
+  address: text("address"),
+  phone: text("phone"),
+  email: text("email"),
+  nif: text("nif"),
+  logo: text("logo"),
+  vatRate: numeric("vat_rate", { precision: 5, scale: 4 }),
+  currency: text("currency").notNull().default("€"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
@@ -308,6 +325,8 @@ export const catalogItemsRelations = relations(catalogItems, ({ one }) => ({
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Organization = typeof organizations.$inferSelect;
+export type NewOrganization = typeof organizations.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 export type Message = typeof messages.$inferSelect;

@@ -8,7 +8,7 @@ vi.mock("../../infrastructure/db/client.js", () => ({
 }));
 
 import { createTestApp, createAuthHeaders, type TestContext } from "../helpers/test-app.js";
-import { fakeUser } from "../helpers/mock-repos.js";
+import { fakeUser, fakeOrganization } from "../helpers/mock-repos.js";
 
 describe("Admin API", () => {
   let ctx: TestContext;
@@ -106,6 +106,7 @@ describe("Admin API", () => {
   it("POST /admin/organizations returns 201 on success", async () => {
     ctx.repos.user.findFirstByOrg.mockResolvedValue(null);
     ctx.repos.user.findByEmail.mockResolvedValue(null);
+    ctx.repos.org.create.mockResolvedValue(fakeOrganization({ orgId: "new-org" }));
     ctx.repos.user.create.mockResolvedValue(
       fakeUser({ id: "u-org", email: "orgadmin", orgId: "new-org" }),
     );
@@ -147,6 +148,7 @@ describe("Admin API", () => {
     ctx.repos.topic.deleteByOrg.mockResolvedValue(undefined);
     ctx.repos.session.deleteByOrgId.mockResolvedValue(undefined);
     ctx.repos.user.deleteByOrg.mockResolvedValue(undefined);
+    ctx.repos.org.deleteByOrgId.mockResolvedValue(undefined);
 
     const res = await ctx.app.request("/admin/organizations/org-2", {
       method: "DELETE",

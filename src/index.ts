@@ -9,6 +9,7 @@ import { DrizzleConversationRepository } from "./infrastructure/repositories/dri
 import { DrizzleWhatsAppSessionRepository } from "./infrastructure/repositories/drizzle-whatsapp-session.repository.js";
 import { DrizzleTopicRepository } from "./infrastructure/repositories/drizzle-topic.repository.js";
 import { DrizzleOAuthTokenRepository } from "./infrastructure/repositories/drizzle-oauth-token.repository.js";
+import { DrizzleOrganizationRepository } from "./infrastructure/repositories/drizzle-organization.repository.js";
 
 // Application — managers
 import { UserManager } from "./application/managers/user.manager.js";
@@ -55,6 +56,7 @@ const convRepo = new DrizzleConversationRepository();
 const sessionRepo = new DrizzleWhatsAppSessionRepository();
 const topicRepo = new DrizzleTopicRepository();
 const oauthTokenRepo = new DrizzleOAuthTokenRepository();
+const orgRepo = new DrizzleOrganizationRepository();
 
 // 2. Managers
 const userManager = new UserManager(userRepo, PASSWORD_SALT);
@@ -62,7 +64,7 @@ const docManager = new DocumentManager(docRepo);
 const convManager = new ConversationManager(convRepo);
 const waManager = new WhatsAppManager(sessionRepo, userRepo);
 const topicManager = new TopicManager(topicRepo);
-const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, PASSWORD_SALT);
+const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, PASSWORD_SALT);
 const tokenEncryption = new AesTokenEncryption();
 const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 

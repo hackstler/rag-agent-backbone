@@ -22,6 +22,13 @@
       "when": 1772656300000,
       "tag": "0006_add_catalog_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772656400000,
+      "tag": "0007_add_organizations_table",
+      "breakpoints": true
     }
   ]
 }

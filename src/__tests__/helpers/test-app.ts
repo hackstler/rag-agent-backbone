@@ -25,6 +25,7 @@ import {
   createMockConversationRepo,
   createMockSessionRepo,
   createMockTopicRepo,
+  createMockOrgRepo,
 } from "./mock-repos.js";
 import type { AuthConfig } from "../../config/auth.config.js";
 
@@ -60,6 +61,7 @@ export interface TestContext {
     conv: ReturnType<typeof createMockConversationRepo>;
     session: ReturnType<typeof createMockSessionRepo>;
     topic: ReturnType<typeof createMockTopicRepo>;
+    org: ReturnType<typeof createMockOrgRepo>;
   };
   managers: {
     user: UserManager;
@@ -82,6 +84,7 @@ export function createTestApp(): TestContext {
     conv: createMockConversationRepo(),
     session: createMockSessionRepo(),
     topic: createMockTopicRepo(),
+    org: createMockOrgRepo(),
   };
 
   const managers = {
@@ -90,7 +93,7 @@ export function createTestApp(): TestContext {
     conv: new ConversationManager(repos.conv),
     wa: new WhatsAppManager(repos.session, repos.user),
     topic: new TopicManager(repos.topic),
-    org: new OrganizationManager(repos.user, repos.doc, repos.topic, repos.session, PASSWORD_SALT),
+    org: new OrganizationManager(repos.user, repos.doc, repos.topic, repos.session, repos.org, PASSWORD_SALT),
   };
 
   const mockAgent = {
