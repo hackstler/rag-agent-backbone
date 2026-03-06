@@ -9,6 +9,7 @@ import { NotFoundError, ConflictError, ValidationError, ForbiddenError } from ".
 
 export interface OrgSummary {
   orgId: string;
+  name: string | null;
   userCount: number;
   docCount: number;
   createdAt: string | null;
@@ -62,8 +63,17 @@ export class OrganizationManager {
 
     const docCountMap = new Map(docCounts.map((d) => [d.orgId, d.docCount]));
 
+    // Fetch org details for names
+    const orgDetails = await Promise.all(
+      userCounts.map((row) => this.orgRepo.findByOrgId(row.orgId))
+    );
+    const orgNameMap = new Map(
+      orgDetails.filter(Boolean).map((o) => [o!.orgId, o!.name])
+    );
+
     return userCounts.map((row) => ({
       orgId: row.orgId,
+      name: orgNameMap.get(row.orgId) ?? null,
       userCount: row.userCount,
       docCount: docCountMap.get(row.orgId) ?? 0,
       createdAt: row.earliestCreatedAt ? row.earliestCreatedAt.toISOString() : null,
