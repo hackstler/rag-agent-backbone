@@ -13,37 +13,40 @@ interface DocumentAttachment {
   filename: string;
 }
 
-interface QuoteToolResult {
-  success?: boolean;
-  pdfBase64?: string;
-  filename?: string;
+/**
+ * Deep-search any object tree for a node containing pdfBase64 + filename.
+ * Avoids depending on a specific Mastra payload wrapper structure.
+ */
+function deepFindPdf(obj: unknown, depth = 0): DocumentAttachment | null {
+  if (depth > 10 || obj == null || typeof obj !== "object") return null;
+
+  const rec = obj as Record<string, unknown>;
+
+  // Check if THIS object has the PDF fields
+  if (
+    typeof rec["pdfBase64"] === "string" && rec["pdfBase64"].length > 0 &&
+    typeof rec["filename"] === "string" && rec["filename"].length > 0
+  ) {
+    return { pdfBase64: rec["pdfBase64"] as string, filename: rec["filename"] as string };
+  }
+
+  // Recurse into arrays and object values
+  const values = Array.isArray(obj) ? obj : Object.values(rec);
+  for (const v of values) {
+    const found = deepFindPdf(v, depth + 1);
+    if (found) return found;
+  }
+  return null;
 }
 
 /**
- * Scans delegation steps for a calculateBudget tool result containing a PDF.
- * Mastra wraps tool return values as `{ payload: { toolName, result: <actual data> } }`.
+ * Scans agent result steps for a PDF attachment (from calculateBudget tool).
+ * Uses deep recursive search to be resilient to Mastra payload wrapping changes.
  */
 function extractPdfFromSteps(
   steps: Array<{ toolResults?: Array<unknown> }>
 ): DocumentAttachment | null {
-  for (const step of steps) {
-    for (const tr of step.toolResults ?? []) {
-      const payload = (tr as { payload?: { toolName?: string; result?: QuoteToolResult } }).payload;
-      const result = payload?.result;
-      if (result?.success && result.pdfBase64 && result.filename) {
-        return { pdfBase64: result.pdfBase64, filename: result.filename };
-      }
-      // Check nested delegation results (coordinator → sub-agent)
-      const nested = (payload?.result as { toolResults?: Array<unknown> } | undefined)?.toolResults ?? [];
-      for (const ntr of nested) {
-        const np = (ntr as { payload?: { result?: QuoteToolResult } }).payload?.result;
-        if (np?.success && np.pdfBase64 && np.filename) {
-          return { pdfBase64: np.pdfBase64, filename: np.filename };
-        }
-      }
-    }
-  }
-  return null;
+  return deepFindPdf(steps);
 }
 
 const qrSchema = z.object({
@@ -185,7 +188,21 @@ export function createInternalController(
       const waText = formatForWhatsApp(replyText) + buildSourcesFooter(sources);
 
       // Check for PDF attachment from quote tool
-      const document = extractPdfFromSteps(steps);
+      const document = extractPdfFromSteps(result.steps ?? []);
+
+      if (document) {
+        console.log("[internal/message] PDF found:", document.filename);
+      } else {
+        // Log step structure to debug missing PDFs
+        const stepSummary = (result.steps ?? []).map((s, i) => ({
+          step: i,
+          toolResults: (s.toolResults ?? []).map((tr) => {
+            const p = (tr as { payload?: { toolName?: string } }).payload;
+            return p?.toolName ?? "unknown";
+          }),
+        }));
+        console.log("[internal/message] no PDF found. steps:", JSON.stringify(stepSummary));
+      }
 
       return c.json({
         data: { reply: waText, ...(document ? { document } : {}) },
