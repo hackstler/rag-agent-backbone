@@ -69,7 +69,11 @@ export class PdfService {
 
     if (company.logo) {
       try {
-        const logoBytes = Buffer.from(company.logo, "base64");
+        // Strip data-URI prefix if present (e.g. "data:image/png;base64,...")
+        const raw = company.logo.includes(",")
+          ? company.logo.split(",")[1]!
+          : company.logo;
+        const logoBytes = Buffer.from(raw, "base64");
         // Try PNG first, fall back to JPEG
         try {
           logoImage = await doc.embedPng(logoBytes);
