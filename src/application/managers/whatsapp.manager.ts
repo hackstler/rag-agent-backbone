@@ -34,7 +34,19 @@ export class WhatsAppManager {
     orgId: string
   ): Promise<Pick<WhatsappSession, "id" | "userId" | "orgId" | "status">> {
     const existing = await this.sessionRepo.findByUserId(userId);
-    if (existing) throw new ConflictError("WhatsApp session", `userId '${userId}'`);
+
+    if (existing && existing.status !== "disconnected") {
+      throw new ConflictError("WhatsApp session", `userId '${userId}'`);
+    }
+
+    if (existing) {
+      await this.sessionRepo.updateByUserId(userId, {
+        status: "pending",
+        qrData: null,
+        phone: null,
+      });
+      return { id: existing.id, userId, orgId, status: "pending" };
+    }
 
     return this.sessionRepo.create({ userId, orgId, status: "pending" });
   }

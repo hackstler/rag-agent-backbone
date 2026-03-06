@@ -84,8 +84,29 @@ describe("WhatsAppManager", () => {
       expect(result).toEqual(created);
     });
 
-    it("throws ConflictError when session already exists", async () => {
-      sessionRepo.findByUserId.mockResolvedValue(fakeSession());
+    it("re-enables a disconnected session by updating to pending", async () => {
+      const existing = fakeSession({ id: "s-old", status: "disconnected", phone: "+123" });
+      sessionRepo.findByUserId.mockResolvedValue(existing);
+      sessionRepo.updateByUserId.mockResolvedValue(undefined);
+
+      const result = await manager.enableForUser("u-1", "org-1");
+
+      expect(sessionRepo.updateByUserId).toHaveBeenCalledWith("u-1", {
+        status: "pending",
+        qrData: null,
+        phone: null,
+      });
+      expect(result.status).toBe("pending");
+    });
+
+    it("throws ConflictError when active session already exists", async () => {
+      sessionRepo.findByUserId.mockResolvedValue(fakeSession({ status: "connected" }));
+
+      await expect(manager.enableForUser("u-1", "org-1")).rejects.toThrow(ConflictError);
+    });
+
+    it("throws ConflictError when session is pending", async () => {
+      sessionRepo.findByUserId.mockResolvedValue(fakeSession({ status: "pending" }));
 
       await expect(manager.enableForUser("u-1", "org-1")).rejects.toThrow(ConflictError);
     });
