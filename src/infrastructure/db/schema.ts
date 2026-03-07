@@ -226,6 +226,26 @@ export const catalogItems = pgTable(
   })
 );
 
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: text("org_id").notNull(),
+    role: text("role").notNull().default("user"),
+    email: text("email"),
+    tokenHash: text("token_hash").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    usedBy: uuid("used_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    tokenHashIdx: index("invitations_token_hash_idx").on(table.tokenHash),
+    orgIdIdx: index("invitations_org_id_idx").on(table.orgId),
+  })
+);
+
 // Embedding dimension: 768 for Gemini gemini-embedding-001 (default)
 // 1536 for OpenAI text-embedding-3-small — set EMBEDDING_DIM env var to override
 const EMBEDDING_DIM = Number(process.env["EMBEDDING_DIM"] ?? 768);
@@ -315,6 +335,11 @@ export const oauthTokensRelations = relations(oauthTokens, ({ one }) => ({
   }),
 }));
 
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  creator: one(users, { fields: [invitations.createdBy], references: [users.id], relationName: "invitationCreator" }),
+  usedByUser: one(users, { fields: [invitations.usedBy], references: [users.id], relationName: "invitationUsedBy" }),
+}));
+
 export const catalogsRelations = relations(catalogs, ({ many }) => ({
   items: many(catalogItems),
 }));
@@ -352,3 +377,5 @@ export type Catalog = typeof catalogs.$inferSelect;
 export type NewCatalog = typeof catalogs.$inferInsert;
 export type CatalogItem = typeof catalogItems.$inferSelect;
 export type NewCatalogItem = typeof catalogItems.$inferInsert;
+export type InvitationRow = typeof invitations.$inferSelect;
+export type NewInvitationRow = typeof invitations.$inferInsert;

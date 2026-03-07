@@ -243,6 +243,31 @@ export interface NewOAuthToken {
   updatedAt?: Date | undefined;
 }
 
+// ── Invitation ──────────────────────────────────────────────────────────────
+
+export interface Invitation {
+  id: string;
+  orgId: string;
+  role: string;
+  email: string | null;
+  tokenHash: string;
+  createdBy: string | null;
+  expiresAt: Date;
+  usedAt: Date | null;
+  usedBy: string | null;
+  createdAt: Date;
+}
+
+export interface NewInvitation {
+  id?: string | undefined;
+  orgId: string;
+  role?: string | undefined;
+  email?: string | null | undefined;
+  tokenHash: string;
+  createdBy?: string | null | undefined;
+  expiresAt: Date;
+}
+
 // ── Catalog ─────────────────────────────────────────────────────────────────
 
 export interface Catalog {

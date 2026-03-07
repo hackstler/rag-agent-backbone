@@ -11,6 +11,7 @@ import { DrizzleTopicRepository } from "./infrastructure/repositories/drizzle-to
 import { DrizzleOAuthTokenRepository } from "./infrastructure/repositories/drizzle-oauth-token.repository.js";
 import { DrizzleOrganizationRepository } from "./infrastructure/repositories/drizzle-organization.repository.js";
 import { DrizzleCatalogRepository } from "./infrastructure/repositories/drizzle-catalog.repository.js";
+import { DrizzleInvitationRepository } from "./infrastructure/repositories/drizzle-invitation.repository.js";
 
 // Application — managers
 import { UserManager } from "./application/managers/user.manager.js";
@@ -21,6 +22,7 @@ import { TopicManager } from "./application/managers/topic.manager.js";
 import { OrganizationManager } from "./application/managers/organization.manager.js";
 import { OAuthManager } from "./application/managers/oauth.manager.js";
 import { CatalogManager } from "./application/managers/catalog.manager.js";
+import { InvitationManager } from "./application/managers/invitation.manager.js";
 
 // Plugins
 import { PluginRegistry } from "./plugins/plugin-registry.js";
@@ -63,6 +65,7 @@ const topicRepo = new DrizzleTopicRepository();
 const oauthTokenRepo = new DrizzleOAuthTokenRepository();
 const orgRepo = new DrizzleOrganizationRepository();
 const catalogRepo = new DrizzleCatalogRepository();
+const invitationRepo = new DrizzleInvitationRepository();
 
 // 2. Managers
 const userManager = new UserManager(userRepo, PASSWORD_SALT);
@@ -72,6 +75,7 @@ const waManager = new WhatsAppManager(sessionRepo, userRepo);
 const topicManager = new TopicManager(topicRepo);
 const orgManager = new OrganizationManager(userRepo, docRepo, topicRepo, sessionRepo, orgRepo, catalogRepo, PASSWORD_SALT);
 const catalogManager = new CatalogManager(catalogRepo);
+const invitationManager = new InvitationManager(invitationRepo, orgRepo, PASSWORD_SALT);
 const tokenEncryption = new AesTokenEncryption();
 const oauthManager = new OAuthManager(oauthTokenRepo, tokenEncryption);
 
@@ -108,6 +112,7 @@ const app = createApp({
   authStrategy,
   oauthManager,
   catalogManager,
+  invitationManager,
 });
 
 // ── Startup ────────────────────────────────────────────────────────────────────
@@ -134,8 +139,8 @@ async function main() {
 
   await seedAdminUser();
 
-  // Seed catalog for admin org (uses ADMIN_USERNAME or ADMIN_EMAIL as orgId)
-  const adminOrgId = process.env["ADMIN_USERNAME"] ?? process.env["ADMIN_EMAIL"];
+  // Seed catalog for admin org
+  const adminOrgId = process.env["ADMIN_EMAIL"] ?? process.env["ADMIN_USERNAME"];
   if (adminOrgId) {
     try {
       await seedCatalog(adminOrgId);
@@ -164,7 +169,7 @@ async function seedAdminUser() {
     await userManager.invite({ email, orgId: email, role: "super_admin" });
     console.log(`[startup] Admin user '${email}' created (firebase strategy)`);
   } else {
-    const email = process.env["ADMIN_USERNAME"];
+    const email = process.env["ADMIN_EMAIL"] ?? process.env["ADMIN_USERNAME"];
     const password = process.env["ADMIN_PASSWORD"];
     if (!email || !password) return;
     await userManager.create({ email, password, orgId: email, role: "super_admin" });

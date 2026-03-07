@@ -18,6 +18,7 @@ import type { AuthConfig } from "./config/auth.config.js";
 import type { AuthStrategy } from "./domain/ports/auth-strategy.js";
 import type { OAuthManager } from "./application/managers/oauth.manager.js";
 import type { CatalogManager } from "./application/managers/catalog.manager.js";
+import type { InvitationManager } from "./application/managers/invitation.manager.js";
 
 import { createAuthController } from "./api/controllers/auth.controller.js";
 import { createDocumentController } from "./api/controllers/document.controller.js";
@@ -43,6 +44,7 @@ export interface AppDependencies {
   authStrategy: AuthStrategy | null;
   oauthManager?: OAuthManager;
   catalogManager?: CatalogManager;
+  invitationManager?: InvitationManager;
 }
 
 export function createApp(deps: AppDependencies): Hono {
@@ -68,11 +70,12 @@ export function createApp(deps: AppDependencies): Hono {
   app.use("/auth/me", auth);
   app.use("/auth/profile", auth);
   app.use("/auth/register", optionalAuth());
+  // Public routes: register-with-invite and invite/validate need no auth
   // OAuth routes: authorize, status, disconnect require auth; callback does NOT (Google redirect)
   app.use("/auth/google/authorize", auth);
   app.use("/auth/google/status", auth);
   app.use("/auth/google/disconnect", auth);
-  app.route("/auth", createAuthController(deps.userManager, deps.authConfig, deps.authStrategy));
+  app.route("/auth", createAuthController(deps.userManager, deps.authConfig, deps.authStrategy, deps.invitationManager));
   if (deps.oauthManager) {
     app.route("/auth", createOAuthController(deps.oauthManager));
   }
@@ -115,9 +118,10 @@ export function createApp(deps: AppDependencies): Hono {
   // Admin endpoints — granular permission guards per route group
   app.use("/admin/*", auth);
   app.use("/admin/users/*", requirePermission("view_org_users"));
+  app.use("/admin/invitations/*", requirePermission("view_org_users"));
   app.use("/admin/organizations/*", requirePermission("view_own_org"));
   app.use("/admin/whatsapp/*", requirePermission("view_whatsapp_mgmt"));
-  app.route("/admin", createAdminController(deps.userManager, deps.orgManager, deps.authConfig, deps.waManager));
+  app.route("/admin", createAdminController(deps.userManager, deps.orgManager, deps.authConfig, deps.waManager, deps.invitationManager));
   if (deps.catalogManager) {
     app.use("/admin/catalogs/*", requirePermission("manage_catalogs"));
     app.route("/admin/catalogs", createCatalogController(deps.catalogManager));

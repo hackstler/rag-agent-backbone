@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { UserManager } from "../../application/managers/user.manager.js";
+import type { InvitationManager } from "../../application/managers/invitation.manager.js";
 import type { AuthConfig } from "../../config/auth.config.js";
 import type { AuthStrategy } from "../../domain/ports/auth-strategy.js";
 import { issueToken, type TokenPayload } from "../middleware/auth.js";
@@ -10,6 +11,18 @@ const updateProfileValidator = z.object({
   name: z.string().max(100).optional(),
   surname: z.string().max(100).optional(),
   password: z.string().min(8).optional(),
+  onboardingComplete: z.boolean().optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+});
+
+const registerWithInviteValidator = z.object({
+  inviteToken: z.string().min(1),
+  idToken: z.string().min(1).optional(),
+  email: z.string().email().max(255).optional(),
+  password: z.string().min(8).optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
 });
 
 const registerValidator = z.object({
@@ -34,6 +47,7 @@ export function createAuthController(
   manager: UserManager,
   authConfig: AuthConfig,
   strategy: AuthStrategy | null,
+  invitationManager?: InvitationManager,
 ): Hono {
   const router = new Hono();
 
@@ -128,6 +142,106 @@ export function createAuthController(
   });
 
   /**
+   * POST /auth/register-with-invite
+   * Public endpoint. Registers a new user using an invitation token.
+   */
+  router.post("/register-with-invite", async (c) => {
+    if (!invitationManager) {
+      return c.json({ error: "InternalError", message: "Invitation system not configured" }, 500);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = registerWithInviteValidator.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
+    }
+
+    const { inviteToken, idToken, email: bodyEmail, password, firstName, lastName } = parsed.data;
+
+    // Validate invitation token
+    const validation = await invitationManager.validateToken(inviteToken);
+    if (!validation.valid) {
+      const statusCode = validation.reason === "expired" ? 410 : 400;
+      return c.json({ error: "InvalidInvitation", message: `Invitation ${validation.reason}` }, statusCode);
+    }
+
+    // Determine email based on auth strategy
+    let email: string;
+    let authStrategy: "password" | "firebase" = "password";
+
+    if (idToken && strategy) {
+      // Firebase: verify the ID token
+      const authResult = await strategy.verifyToken(idToken);
+      email = authResult.email;
+      authStrategy = "firebase";
+    } else if (bodyEmail && password) {
+      email = bodyEmail;
+      authStrategy = "password";
+    } else {
+      return c.json({ error: "Bad Request", message: "Provide either idToken (Firebase) or email+password" }, 400);
+    }
+
+    // If invitation has email hint, verify it matches
+    if (validation.email && validation.email !== email) {
+      return c.json({ error: "Bad Request", message: "Email does not match invitation" }, 400);
+    }
+
+    // Create user
+    const { user, role } = await manager.registerWithInvite({
+      email,
+      password,
+      firstName,
+      lastName,
+      orgId: validation.orgId,
+      role: validation.role,
+      authStrategy,
+    });
+
+    // Mark invitation as used
+    await invitationManager.markUsed(validation.invitation.id, user.id);
+
+    // Issue JWT
+    const token = issueToken(
+      { userId: user.id, email: user.email!, orgId: user.orgId!, role: role as "admin" | "user" | "super_admin" },
+      authConfig.jwtTtl,
+    );
+
+    return c.json(
+      { token, user: { id: user.id, email: user.email!, orgId: user.orgId!, role } },
+      201,
+    );
+  });
+
+  /**
+   * GET /auth/invite/validate?token=xxx
+   * Public endpoint. Validates an invitation token without consuming it.
+   */
+  router.get("/invite/validate", async (c) => {
+    if (!invitationManager) {
+      return c.json({ valid: false, reason: "invalid" }, 400);
+    }
+
+    const token = c.req.query("token");
+    if (!token) {
+      return c.json({ valid: false, reason: "invalid" }, 400);
+    }
+
+    const result = await invitationManager.validateToken(token);
+    if (!result.valid) {
+      const statusCode = result.reason === "expired" ? 410 : 400;
+      return c.json({ valid: false, reason: result.reason }, statusCode);
+    }
+
+    return c.json({
+      valid: true,
+      orgId: result.orgId,
+      orgName: result.orgName,
+      role: result.role,
+      email: result.email,
+    });
+  });
+
+  /**
    * GET /auth/me
    * Returns current user info from the Bearer token.
    */
@@ -135,6 +249,7 @@ export function createAuthController(
     const user = c.get("user");
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const fullUser = await manager.getById(user.userId);
+    const meta = fullUser.metadata as Record<string, unknown> | null;
     return c.json({
       userId: user.userId,
       email: user.email,
@@ -142,6 +257,9 @@ export function createAuthController(
       surname: fullUser.surname,
       orgId: user.orgId,
       role: user.role,
+      onboardingComplete: meta?.["onboardingComplete"] !== false, // default true for existing users
+      firstName: meta?.["firstName"] ?? null,
+      lastName: meta?.["lastName"] ?? null,
     });
   });
 
@@ -161,7 +279,13 @@ export function createAuthController(
     }
 
     try {
-      const updated = await manager.updateSelf(user.userId, parsed.data);
+      const { onboardingComplete, firstName, lastName, ...rest } = parsed.data;
+      const updated = await manager.updateSelf(user.userId, {
+        ...rest,
+        onboardingComplete,
+        firstName,
+        lastName,
+      });
       return c.json({ data: updated });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Update failed";

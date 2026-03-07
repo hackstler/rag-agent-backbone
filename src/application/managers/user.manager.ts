@@ -34,6 +34,16 @@ export interface InviteUserDto {
   role?: "admin" | "user" | "super_admin";
 }
 
+export interface RegisterWithInviteDto {
+  email: string;
+  password?: string | undefined;
+  firstName?: string | undefined;
+  lastName?: string | undefined;
+  orgId: string;
+  role: string;
+  authStrategy: "password" | "firebase";
+}
+
 export interface UpdateUserDto {
   email?: string | undefined;
   name?: string | undefined;
@@ -242,9 +252,44 @@ export class UserManager {
     };
   }
 
+  async registerWithInvite(dto: RegisterWithInviteDto): Promise<{ user: User; role: string }> {
+    const existing = await this.repo.findByEmail(dto.email);
+    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
+
+    const role = (dto.role as "admin" | "user" | "super_admin") ?? "user";
+    const metadata: Record<string, unknown> = {
+      authStrategy: dto.authStrategy,
+      onboardingComplete: false,
+    };
+    if (dto.firstName) metadata["firstName"] = dto.firstName;
+    if (dto.lastName) metadata["lastName"] = dto.lastName;
+    if (dto.password && dto.authStrategy === "password") {
+      metadata["passwordHash"] = this.hashPassword(dto.password);
+    }
+
+    const user = await this.repo.create({
+      email: dto.email,
+      name: dto.firstName ?? null,
+      surname: dto.lastName ?? null,
+      orgId: dto.orgId,
+      role,
+      metadata,
+    });
+
+    return { user, role };
+  }
+
   async updateSelf(
     userId: string,
-    dto: { email?: string | undefined; name?: string | undefined; surname?: string | undefined; password?: string | undefined },
+    dto: {
+      email?: string | undefined;
+      name?: string | undefined;
+      surname?: string | undefined;
+      password?: string | undefined;
+      onboardingComplete?: boolean | undefined;
+      firstName?: string | undefined;
+      lastName?: string | undefined;
+    },
   ): Promise<UserListItem> {
     const existingUser = await this.repo.findById(userId);
     if (!existingUser) throw new Error("User not found");
@@ -258,10 +303,18 @@ export class UserManager {
     if (dto.email) updateData["email"] = dto.email;
     if (dto.name !== undefined) updateData["name"] = dto.name;
     if (dto.surname !== undefined) updateData["surname"] = dto.surname;
-    if (dto.password) {
+
+    // Merge metadata fields
+    const metadataUpdates: Record<string, unknown> = {};
+    if (dto.password) metadataUpdates["passwordHash"] = this.hashPassword(dto.password);
+    if (dto.onboardingComplete !== undefined) metadataUpdates["onboardingComplete"] = dto.onboardingComplete;
+    if (dto.firstName !== undefined) metadataUpdates["firstName"] = dto.firstName;
+    if (dto.lastName !== undefined) metadataUpdates["lastName"] = dto.lastName;
+
+    if (Object.keys(metadataUpdates).length > 0) {
       updateData["metadata"] = {
         ...(existingUser.metadata ?? {}),
-        passwordHash: this.hashPassword(dto.password),
+        ...metadataUpdates,
       };
     }
 

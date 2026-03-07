@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { UserManager } from "../../application/managers/user.manager.js";
 import type { OrganizationManager } from "../../application/managers/organization.manager.js";
 import type { WhatsAppManager } from "../../application/managers/whatsapp.manager.js";
+import type { InvitationManager } from "../../application/managers/invitation.manager.js";
 import type { AuthConfig } from "../../config/auth.config.js";
 import type { TokenPayload } from "../middleware/auth.js";
 import { getPermissionScope, hasPermission, type Role } from "../../domain/permissions.js";
@@ -63,11 +64,17 @@ const updateUserValidator = z.object({
   password: z.string().min(8).optional(),
 });
 
+const createInvitationValidator = z.object({
+  email: z.string().email().max(255).optional(),
+  role: z.enum(["admin", "user"]).default("user"),
+});
+
 export function createAdminController(
   userManager: UserManager,
   orgManager: OrganizationManager,
   authConfig: AuthConfig,
   waManager: WhatsAppManager,
+  invitationManager?: InvitationManager,
 ): Hono {
   const router = new Hono();
 
@@ -270,6 +277,70 @@ export function createAdminController(
     }
     const orgId = c.req.param("orgId");
     await orgManager.delete(orgId, caller.orgId);
+    return c.json({ ok: true });
+  });
+
+  // ── Invitations ──────────────────────────────────────────────────────────────
+
+  router.post("/invitations", async (c) => {
+    if (!invitationManager) {
+      return c.json({ error: "InternalError", message: "Invitation system not configured" }, 500);
+    }
+
+    const caller = c.get("user") as TokenPayload;
+    const scope = getPermissionScope(caller.role as Role, "create_org_users");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = createInvitationValidator.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Bad Request", message: parsed.error.message }, 400);
+    }
+
+    const orgId = caller.orgId;
+    const { invitation, token } = await invitationManager.createInvitation(
+      orgId,
+      parsed.data.role,
+      parsed.data.email,
+      caller.userId,
+    );
+
+    const frontendUrl = process.env["FRONTEND_URL"] ?? "http://localhost:5174";
+    const inviteUrl = `${frontendUrl}/register?token=${encodeURIComponent(token)}`;
+
+    return c.json({ invitation, inviteUrl }, 201);
+  });
+
+  router.get("/invitations", async (c) => {
+    if (!invitationManager) {
+      return c.json({ items: [] });
+    }
+
+    const caller = c.get("user") as TokenPayload;
+    const scope = getPermissionScope(caller.role as Role, "view_org_users");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const items = await invitationManager.listByOrg(caller.orgId);
+    return c.json({ items });
+  });
+
+  router.delete("/invitations/:id", async (c) => {
+    if (!invitationManager) {
+      return c.json({ error: "InternalError", message: "Invitation system not configured" }, 500);
+    }
+
+    const caller = c.get("user") as TokenPayload;
+    const scope = getPermissionScope(caller.role as Role, "create_org_users");
+    if (!scope) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const id = c.req.param("id");
+    await invitationManager.revoke(id);
     return c.json({ ok: true });
   });
 
