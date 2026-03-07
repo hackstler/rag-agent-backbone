@@ -47,8 +47,15 @@
     {
       "idx": 6,
       "version": "7",
-      "when": 1772905955669,
-      "tag": "0006_petite_anthem",
+      "when": 1772656700000,
+      "tag": "0010_add_invitations_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772656800000,
+      "tag": "0011_add_user_name_surname",
       "breakpoints": true
     }
   ]
