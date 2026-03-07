@@ -15,12 +15,12 @@ describe("Admin API", () => {
   // super_admin headers — global access
   const superAdminHeaders = {
     "Content-Type": "application/json",
-    ...createAuthHeaders({ userId: "u-1", username: "admin", orgId: "org-1", role: "super_admin" }),
+    ...createAuthHeaders({ userId: "u-1", email: "admin@test.com", orgId: "org-1", role: "super_admin" }),
   };
   // org-scoped admin headers — restricted to own org
   const orgAdminHeaders = {
     "Content-Type": "application/json",
-    ...createAuthHeaders({ userId: "u-2", username: "orgadmin", orgId: "org-1", role: "admin" }),
+    ...createAuthHeaders({ userId: "u-2", email: "orgadmin@test.com", orgId: "org-1", role: "admin" }),
   };
 
   beforeEach(() => {
@@ -56,13 +56,13 @@ describe("Admin API", () => {
   it("POST /admin/users returns 201 on success for super_admin", async () => {
     ctx.repos.user.findByEmail.mockResolvedValue(null);
     ctx.repos.user.create.mockResolvedValue(
-      fakeUser({ id: "u-new", email: "bob", orgId: "org-2" }),
+      fakeUser({ id: "u-new", email: "bob@test.com", orgId: "org-2" }),
     );
 
     const res = await ctx.app.request("/admin/users", {
       method: "POST",
       headers: superAdminHeaders,
-      body: JSON.stringify({ username: "bob", password: "password123", orgId: "org-2" }),
+      body: JSON.stringify({ email: "bob@test.com", password: "password123", orgId: "org-2" }),
     });
 
     expect(res.status).toBe(201);
@@ -72,7 +72,7 @@ describe("Admin API", () => {
     const res = await ctx.app.request("/admin/users", {
       method: "POST",
       headers: orgAdminHeaders,
-      body: JSON.stringify({ username: "bob", password: "password123", orgId: "org-2" }),
+      body: JSON.stringify({ email: "bob@test.com", password: "password123", orgId: "org-2" }),
     });
 
     expect(res.status).toBe(403);
@@ -84,7 +84,7 @@ describe("Admin API", () => {
     const res = await ctx.app.request("/admin/users", {
       method: "POST",
       headers: superAdminHeaders,
-      body: JSON.stringify({ username: "alice", password: "password123", orgId: "org-1" }),
+      body: JSON.stringify({ email: "alice@test.com", password: "password123", orgId: "org-1" }),
     });
 
     expect(res.status).toBe(409);
@@ -144,7 +144,7 @@ describe("Admin API", () => {
     ctx.repos.user.findByEmail.mockResolvedValue(null);
     ctx.repos.org.create.mockResolvedValue(fakeOrganization({ orgId: "new-org" }));
     ctx.repos.user.create.mockResolvedValue(
-      fakeUser({ id: "u-org", email: "orgadmin", orgId: "new-org" }),
+      fakeUser({ id: "u-org", email: "orgadmin@test.com", orgId: "new-org" }),
     );
 
     const res = await ctx.app.request("/admin/organizations", {
@@ -250,7 +250,7 @@ describe("Admin API", () => {
   // ── PATCH /admin/users/:id ──────────────────────────────────────────────────
 
   it("PATCH /admin/users/:id returns 200 on success for super_admin", async () => {
-    const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1", role: "user" });
+    const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1", role: "user" });
     const updated = fakeUser({ id: "u-2", email: "bob-new@test.com", orgId: "org-1", role: "user" });
     ctx.repos.user.findById.mockResolvedValue(existing);
     ctx.repos.user.findByEmail.mockResolvedValue(null);
@@ -270,7 +270,7 @@ describe("Admin API", () => {
   it("PATCH /admin/users/:id returns 403 for user role", async () => {
     const userHeaders = {
       "Content-Type": "application/json",
-      ...createAuthHeaders({ userId: "u-3", username: "alice", orgId: "org-1", role: "user" }),
+      ...createAuthHeaders({ userId: "u-3", email: "alice@test.com", orgId: "org-1", role: "user" }),
     };
 
     const res = await ctx.app.request("/admin/users/u-2", {
@@ -298,7 +298,7 @@ describe("Admin API", () => {
 
   it("returns 403 for regular user accessing /admin/users", async () => {
     const userHeaders = {
-      ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "user" }),
+      ...createAuthHeaders({ userId: "u-1", email: "alice@test.com", orgId: "org-1", role: "user" }),
     };
 
     const res = await ctx.app.request("/admin/users", { headers: userHeaders });
@@ -308,7 +308,7 @@ describe("Admin API", () => {
 
   it("returns 403 for regular user accessing /documents", async () => {
     const userHeaders = {
-      ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "user" }),
+      ...createAuthHeaders({ userId: "u-1", email: "alice@test.com", orgId: "org-1", role: "user" }),
     };
 
     const res = await ctx.app.request("/documents", { headers: userHeaders });

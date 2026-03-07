@@ -15,7 +15,7 @@ describe("Topics API", () => {
   let ctx: TestContext;
   const headers = {
     "Content-Type": "application/json",
-    ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "admin" }),
+    ...createAuthHeaders({ userId: "u-1", email: "alice@test.com", orgId: "org-1", role: "admin" }),
   };
 
   beforeEach(() => {

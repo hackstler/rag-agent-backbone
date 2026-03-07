@@ -13,8 +13,10 @@ const listUsersValidator = z.object({
 });
 
 const createUserValidator = z.object({
-  username: z.string().min(3).max(50),
+  email: z.string().email().max(255),
   password: z.string().min(8),
+  name: z.string().max(100).optional(),
+  surname: z.string().max(100).optional(),
   orgId: z.string().min(1),
   role: z.enum(["admin", "user", "super_admin"]).default("user"),
 });
@@ -55,6 +57,8 @@ const updateOrgValidator = z.object({
 
 const updateUserValidator = z.object({
   email: z.string().email().max(255).optional(),
+  name: z.string().max(100).optional(),
+  surname: z.string().max(100).optional(),
   role: z.enum(["admin", "user", "super_admin"]).optional(),
   password: z.string().min(8).optional(),
 });
@@ -120,7 +124,7 @@ export function createAdminController(
       
     }
 
-    // Password strategy: create with username + password
+    // Password strategy: create with email + password
     const parsed = createUserValidator.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: "Bad Request", message: parsed.error.message }, 400);

@@ -96,7 +96,7 @@ describe("Internal API", () => {
 
   it("rejects user JWT with 403", async () => {
     const userHeaders = {
-      ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "user" }),
+      ...createAuthHeaders({ userId: "u-1", email: "alice@test.com", orgId: "org-1", role: "user" }),
     };
 
     const res = await ctx.app.request("/internal/whatsapp/sessions", {

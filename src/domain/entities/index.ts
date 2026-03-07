@@ -11,6 +11,8 @@
 export interface User {
   id: string;
   email: string | null;
+  name: string | null;
+  surname: string | null;
   orgId: string;
   role: "admin" | "user" | "super_admin";
   metadata: Record<string, unknown> | null;
@@ -20,6 +22,8 @@ export interface User {
 export interface NewUser {
   id?: string | undefined;
   email?: string | null | undefined;
+  name?: string | null | undefined;
+  surname?: string | null | undefined;
   orgId: string;
   role?: "admin" | "user" | "super_admin" | undefined;
   metadata?: Record<string, unknown> | null | undefined;

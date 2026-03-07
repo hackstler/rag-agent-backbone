@@ -39,7 +39,7 @@ const PASSWORD_SALT = TEST_JWT_SECRET;
 
 export function createAuthHeaders(payload: {
   userId: string;
-  username: string;
+  email: string;
   orgId: string;
   role: "admin" | "user" | "super_admin";
 }): Record<string, string> {

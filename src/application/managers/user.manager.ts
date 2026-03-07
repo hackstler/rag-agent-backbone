@@ -11,17 +11,21 @@ import {
 import { getPermissionScope, type Role } from "../../domain/permissions.js";
 
 export interface RegisterUserDto {
-  username: string;
+  email: string;
   password: string;
-  orgId?: string;
-  role?: "admin" | "user" | "super_admin";
+  name?: string | undefined;
+  surname?: string | undefined;
+  orgId?: string | undefined;
+  role?: "admin" | "user" | "super_admin" | undefined;
 }
 
 export interface CreateUserDto {
-  username: string;
+  email: string;
   password: string;
+  name?: string | undefined;
+  surname?: string | undefined;
   orgId: string;
-  role?: "admin" | "user" | "super_admin";
+  role?: "admin" | "user" | "super_admin" | undefined;
 }
 
 export interface InviteUserDto {
@@ -32,6 +36,8 @@ export interface InviteUserDto {
 
 export interface UpdateUserDto {
   email?: string | undefined;
+  name?: string | undefined;
+  surname?: string | undefined;
   role?: "admin" | "user" | "super_admin" | undefined;
   password?: string | undefined;
 }
@@ -39,6 +45,8 @@ export interface UpdateUserDto {
 export interface UserListItem {
   id: string;
   email: string | null;
+  name: string | null;
+  surname: string | null;
   orgId: string;
   role: string;
   createdAt: string;
@@ -65,13 +73,15 @@ export class UserManager {
       throw new ForbiddenError("Only admins can create users");
     }
 
-    const existing = await this.repo.findByEmail(dto.username);
-    if (existing) throw new ConflictError("User", `email '${dto.username}'`);
+    const existing = await this.repo.findByEmail(dto.email);
+    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
 
     const role = isFirstUser ? "super_admin" : (dto.role ?? "user");
     const user = await this.repo.create({
-      email: dto.username,
-      orgId: dto.orgId ?? dto.username,
+      email: dto.email,
+      name: dto.name ?? null,
+      surname: dto.surname ?? null,
+      orgId: dto.orgId ?? dto.email,
       role,
       metadata: { passwordHash: this.hashPassword(dto.password) },
     });
@@ -80,10 +90,10 @@ export class UserManager {
   }
 
   async login(
-    username: string,
+    email: string,
     password: string,
   ): Promise<{ user: User; role: "admin" | "user" | "super_admin" }> {
-    const user = await this.repo.findByEmail(username);
+    const user = await this.repo.findByEmail(email);
     if (!user) throw new UnauthorizedError("Invalid credentials");
 
     const meta = user.metadata as { passwordHash?: string } | null;
@@ -105,6 +115,8 @@ export class UserManager {
     return users.map((u) => ({
       id: u.id,
       email: u.email,
+      name: u.name,
+      surname: u.surname,
       orgId: u.orgId,
       role: u.role,
       createdAt: u.createdAt.toISOString(),
@@ -112,12 +124,14 @@ export class UserManager {
   }
 
   async create(dto: CreateUserDto): Promise<UserListItem> {
-    const existing = await this.repo.findByEmail(dto.username);
-    if (existing) throw new ConflictError("User", `email '${dto.username}'`);
+    const existing = await this.repo.findByEmail(dto.email);
+    if (existing) throw new ConflictError("User", `email '${dto.email}'`);
 
     const role = dto.role ?? "user";
     const user = await this.repo.create({
-      email: dto.username,
+      email: dto.email,
+      name: dto.name ?? null,
+      surname: dto.surname ?? null,
       orgId: dto.orgId,
       role,
       metadata: { passwordHash: this.hashPassword(dto.password) },
@@ -126,6 +140,8 @@ export class UserManager {
     return {
       id: user.id,
       email: user.email,
+      name: user.name,
+      surname: user.surname,
       orgId: user.orgId,
       role,
       createdAt: user.createdAt.toISOString(),
@@ -163,6 +179,8 @@ export class UserManager {
     return {
       id: user.id,
       email: user.email,
+      name: user.name,
+      surname: user.surname,
       orgId: user.orgId,
       role,
       createdAt: user.createdAt.toISOString(),
@@ -200,6 +218,8 @@ export class UserManager {
     // Build update payload
     const updateData: Record<string, unknown> = {};
     if (dto.email) updateData["email"] = dto.email;
+    if (dto.name !== undefined) updateData["name"] = dto.name;
+    if (dto.surname !== undefined) updateData["surname"] = dto.surname;
     if (dto.role) updateData["role"] = dto.role;
     if (dto.password) {
       updateData["metadata"] = {
@@ -214,6 +234,8 @@ export class UserManager {
     return {
       id: updated.id,
       email: updated.email,
+      name: updated.name,
+      surname: updated.surname,
       orgId: updated.orgId,
       role: updated.role,
       createdAt: updated.createdAt.toISOString(),
@@ -222,7 +244,7 @@ export class UserManager {
 
   async updateSelf(
     userId: string,
-    dto: { email?: string | undefined; password?: string | undefined },
+    dto: { email?: string | undefined; name?: string | undefined; surname?: string | undefined; password?: string | undefined },
   ): Promise<UserListItem> {
     const existingUser = await this.repo.findById(userId);
     if (!existingUser) throw new Error("User not found");
@@ -234,6 +256,8 @@ export class UserManager {
 
     const updateData: Record<string, unknown> = {};
     if (dto.email) updateData["email"] = dto.email;
+    if (dto.name !== undefined) updateData["name"] = dto.name;
+    if (dto.surname !== undefined) updateData["surname"] = dto.surname;
     if (dto.password) {
       updateData["metadata"] = {
         ...(existingUser.metadata ?? {}),
@@ -247,6 +271,8 @@ export class UserManager {
     return {
       id: updated.id,
       email: updated.email,
+      name: updated.name,
+      surname: updated.surname,
       orgId: updated.orgId,
       role: updated.role,
       createdAt: updated.createdAt.toISOString(),

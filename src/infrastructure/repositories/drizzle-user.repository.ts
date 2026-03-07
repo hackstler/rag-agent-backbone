@@ -1,4 +1,4 @@
-import { eq, ilike, and, count, min, type SQL } from "drizzle-orm";
+import { eq, ilike, and, or, count, min, type SQL } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { users } from "../db/schema.js";
 import type { User, NewUser } from "../db/schema.js";
@@ -35,7 +35,16 @@ export class DrizzleUserRepository implements UserRepository {
   async findAll(filters?: { orgId?: string; search?: string }): Promise<User[]> {
     const conditions: SQL[] = [];
     if (filters?.orgId) conditions.push(eq(users.orgId, filters.orgId));
-    if (filters?.search) conditions.push(ilike(users.email, `%${filters.search}%`));
+    if (filters?.search) {
+      const pattern = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(users.email, pattern),
+          ilike(users.name, pattern),
+          ilike(users.surname, pattern),
+        )!
+      );
+    }
 
     return db
       .select()

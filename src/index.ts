@@ -164,11 +164,11 @@ async function seedAdminUser() {
     await userManager.invite({ email, orgId: email, role: "super_admin" });
     console.log(`[startup] Admin user '${email}' created (firebase strategy)`);
   } else {
-    const username = process.env["ADMIN_USERNAME"];
+    const email = process.env["ADMIN_USERNAME"];
     const password = process.env["ADMIN_PASSWORD"];
-    if (!username || !password) return;
-    await userManager.create({ username, password, orgId: username, role: "super_admin" });
-    console.log(`[startup] Admin user '${username}' created`);
+    if (!email || !password) return;
+    await userManager.create({ email, password, orgId: email, role: "super_admin" });
+    console.log(`[startup] Admin user '${email}' created`);
   }
 }
 

@@ -34,13 +34,13 @@ describe("UserManager", () => {
       repo.findByEmail.mockResolvedValue(null);
       repo.create.mockResolvedValue(user);
 
-      const result = await manager.register({ username: "alice", password: "pass" });
+      const result = await manager.register({ email: "alice@test.com", password: "pass" });
 
       expect(repo.count).toHaveBeenCalled();
-      expect(repo.findByEmail).toHaveBeenCalledWith("alice");
+      expect(repo.findByEmail).toHaveBeenCalledWith("alice@test.com");
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: "alice",
+          email: "alice@test.com",
           role: "super_admin",
         }),
       );
@@ -51,24 +51,24 @@ describe("UserManager", () => {
       repo.count.mockResolvedValue(1);
 
       await expect(
-        manager.register({ username: "bob", password: "pass" }),
+        manager.register({ email: "bob@test.com", password: "pass" }),
       ).rejects.toThrow(ForbiddenError);
     });
 
     it("allows admin to register subsequent users", async () => {
-      const user = fakeUser({ email: "bob", role: "user", metadata: { passwordHash: hashPassword("pass") } });
+      const user = fakeUser({ email: "bob@test.com", role: "user", metadata: { passwordHash: hashPassword("pass") } });
       repo.count.mockResolvedValue(1);
       repo.findByEmail.mockResolvedValue(null);
       repo.create.mockResolvedValue(user);
 
       const result = await manager.register(
-        { username: "bob", password: "pass" },
+        { email: "bob@test.com", password: "pass" },
         "admin",
       );
 
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: "bob",
+          email: "bob@test.com",
           role: "user",
         }),
       );
@@ -76,19 +76,19 @@ describe("UserManager", () => {
     });
 
     it("allows super_admin to register subsequent users", async () => {
-      const user = fakeUser({ email: "carol", role: "user", metadata: { passwordHash: hashPassword("pass") } });
+      const user = fakeUser({ email: "carol@test.com", role: "user", metadata: { passwordHash: hashPassword("pass") } });
       repo.count.mockResolvedValue(1);
       repo.findByEmail.mockResolvedValue(null);
       repo.create.mockResolvedValue(user);
 
       const result = await manager.register(
-        { username: "carol", password: "pass" },
+        { email: "carol@test.com", password: "pass" },
         "super_admin",
       );
 
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: "carol",
+          email: "carol@test.com",
           role: "user",
         }),
       );
@@ -100,7 +100,7 @@ describe("UserManager", () => {
       repo.findByEmail.mockResolvedValue(fakeUser());
 
       await expect(
-        manager.register({ username: "alice", password: "pass" }),
+        manager.register({ email: "alice@test.com", password: "pass" }),
       ).rejects.toThrow(ConflictError);
     });
   });
@@ -115,9 +115,9 @@ describe("UserManager", () => {
       });
       repo.findByEmail.mockResolvedValue(user);
 
-      const result = await manager.login("alice", "password");
+      const result = await manager.login("alice@test.com", "password");
 
-      expect(repo.findByEmail).toHaveBeenCalledWith("alice");
+      expect(repo.findByEmail).toHaveBeenCalledWith("alice@test.com");
       expect(result.user).toEqual(user);
       expect(result.role).toBe("user");
     });
@@ -129,13 +129,13 @@ describe("UserManager", () => {
       });
       repo.findByEmail.mockResolvedValue(user);
 
-      await expect(manager.login("alice", "wrong")).rejects.toThrow(UnauthorizedError);
+      await expect(manager.login("alice@test.com", "wrong")).rejects.toThrow(UnauthorizedError);
     });
 
     it("throws UnauthorizedError when user does not exist", async () => {
       repo.findByEmail.mockResolvedValue(null);
 
-      await expect(manager.login("ghost", "pass")).rejects.toThrow(UnauthorizedError);
+      await expect(manager.login("ghost@test.com", "pass")).rejects.toThrow(UnauthorizedError);
     });
   });
 
@@ -165,7 +165,7 @@ describe("UserManager", () => {
     it("creates user and returns UserListItem", async () => {
       const user = fakeUser({
         id: "u-2",
-        email: "bob",
+        email: "bob@test.com",
         orgId: "org-2",
         role: "user",
         metadata: { passwordHash: hashPassword("pass") },
@@ -175,22 +175,24 @@ describe("UserManager", () => {
       repo.create.mockResolvedValue(user);
 
       const result = await manager.create({
-        username: "bob",
+        email: "bob@test.com",
         password: "pass",
         orgId: "org-2",
       });
 
-      expect(repo.findByEmail).toHaveBeenCalledWith("bob");
+      expect(repo.findByEmail).toHaveBeenCalledWith("bob@test.com");
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: "bob",
+          email: "bob@test.com",
           orgId: "org-2",
           role: "user",
         }),
       );
       expect(result).toEqual({
         id: "u-2",
-        email: "bob",
+        email: "bob@test.com",
+        name: null,
+        surname: null,
         orgId: "org-2",
         role: "user",
         createdAt: new Date("2025-06-01").toISOString(),
@@ -201,7 +203,7 @@ describe("UserManager", () => {
       repo.findByEmail.mockResolvedValue(fakeUser());
 
       await expect(
-        manager.create({ username: "alice", password: "pass", orgId: "org-1" }),
+        manager.create({ email: "alice@test.com", password: "pass", orgId: "org-1" }),
       ).rejects.toThrow(ConflictError);
     });
   });
@@ -234,7 +236,7 @@ describe("UserManager", () => {
 
   describe("update", () => {
     it("updates user email successfully as super_admin", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1" });
       const updated = fakeUser({ id: "u-2", email: "bob-new@test.com", orgId: "org-1" });
       repo.findById.mockResolvedValue(existing);
       repo.findByEmail.mockResolvedValue(null);
@@ -255,8 +257,8 @@ describe("UserManager", () => {
     });
 
     it("updates user role successfully as super_admin", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1", role: "user" });
-      const updated = fakeUser({ id: "u-2", email: "bob", orgId: "org-1", role: "admin" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1", role: "user" });
+      const updated = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1", role: "admin" });
       repo.findById.mockResolvedValue(existing);
       repo.update.mockResolvedValue(updated);
 
@@ -271,7 +273,7 @@ describe("UserManager", () => {
     });
 
     it("admin can update user in same org", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1", role: "user" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1", role: "user" });
       const updated = fakeUser({ id: "u-2", email: "bob-new@test.com", orgId: "org-1" });
       repo.findById.mockResolvedValue(existing);
       repo.findByEmail.mockResolvedValue(null);
@@ -288,7 +290,7 @@ describe("UserManager", () => {
     });
 
     it("throws Forbidden when admin updates user in different org", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-2", role: "user" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-2", role: "user" });
       repo.findById.mockResolvedValue(existing);
 
       await expect(
@@ -303,7 +305,7 @@ describe("UserManager", () => {
     });
 
     it("throws when non-super_admin tries to assign super_admin role", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1" });
       repo.findById.mockResolvedValue(existing);
 
       await expect(
@@ -312,7 +314,7 @@ describe("UserManager", () => {
     });
 
     it("throws when email already in use", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1" });
       repo.findById.mockResolvedValue(existing);
       repo.findByEmail.mockResolvedValue(fakeUser({ id: "u-3", email: "taken@test.com" }));
 
@@ -330,8 +332,8 @@ describe("UserManager", () => {
     });
 
     it("updates password by hashing it into metadata", async () => {
-      const existing = fakeUser({ id: "u-2", email: "bob", orgId: "org-1", metadata: { passwordHash: "old" } });
-      const updated = fakeUser({ id: "u-2", email: "bob", orgId: "org-1" });
+      const existing = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1", metadata: { passwordHash: "old" } });
+      const updated = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "org-1" });
       repo.findById.mockResolvedValue(existing);
       repo.update.mockResolvedValue(updated);
 
@@ -355,7 +357,7 @@ describe("UserManager", () => {
 
   describe("updateSelf", () => {
     it("updates own email successfully", async () => {
-      const existing = fakeUser({ id: "u-1", email: "alice" });
+      const existing = fakeUser({ id: "u-1", email: "alice@test.com" });
       const updated = fakeUser({ id: "u-1", email: "alice-new@test.com" });
       repo.findById.mockResolvedValue(existing);
       repo.findByEmail.mockResolvedValue(null);
@@ -371,8 +373,8 @@ describe("UserManager", () => {
     });
 
     it("updates own password successfully", async () => {
-      const existing = fakeUser({ id: "u-1", email: "alice", metadata: { passwordHash: "old" } });
-      const updated = fakeUser({ id: "u-1", email: "alice" });
+      const existing = fakeUser({ id: "u-1", email: "alice@test.com", metadata: { passwordHash: "old" } });
+      const updated = fakeUser({ id: "u-1", email: "alice@test.com" });
       repo.findById.mockResolvedValue(existing);
       repo.update.mockResolvedValue(updated);
 
@@ -389,7 +391,7 @@ describe("UserManager", () => {
     });
 
     it("throws when email already in use", async () => {
-      const existing = fakeUser({ id: "u-1", email: "alice" });
+      const existing = fakeUser({ id: "u-1", email: "alice@test.com" });
       repo.findById.mockResolvedValue(existing);
       repo.findByEmail.mockResolvedValue(fakeUser({ id: "u-3", email: "taken@test.com" }));
 

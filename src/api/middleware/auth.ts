@@ -8,7 +8,7 @@ import { hasPermission, type Permission, type Role } from "../../domain/permissi
 
 export interface TokenPayload extends JwtPayload {
   userId: string;
-  username: string;
+  email: string;
   orgId: string;
   role: "admin" | "user" | "super_admin";
 }

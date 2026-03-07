@@ -55,6 +55,8 @@ export const contentTypeEnum = pgEnum("content_type", [
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").unique(),
+  name: text("name"),
+  surname: text("surname"),
   orgId: text("org_id").notNull(),
   role: text("role").$type<"admin" | "user" | "super_admin">().notNull().default("user"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),

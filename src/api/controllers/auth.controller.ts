@@ -7,18 +7,22 @@ import { issueToken, type TokenPayload } from "../middleware/auth.js";
 
 const updateProfileValidator = z.object({
   email: z.string().email().max(255).optional(),
+  name: z.string().max(100).optional(),
+  surname: z.string().max(100).optional(),
   password: z.string().min(8).optional(),
 });
 
 const registerValidator = z.object({
-  username: z.string().min(3).max(50),
+  email: z.string().email().max(255),
   password: z.string().min(8),
+  name: z.string().max(100).optional(),
+  surname: z.string().max(100).optional(),
   orgId: z.string().optional(),
   role: z.enum(["admin", "user", "super_admin"]).default("user"),
 });
 
 const passwordLoginValidator = z.object({
-  username: z.string(),
+  email: z.string(),
   password: z.string(),
 });
 
@@ -53,25 +57,25 @@ export function createAuthController(
     }
 
     const caller = c.get("user") as TokenPayload | undefined;
-    const { username, password, role: rawRole } = parsed.data;
-    const dto: Parameters<typeof manager.register>[0] = { username, password, role: rawRole };
+    const { email, password, name, surname, role: rawRole } = parsed.data;
+    const dto: Parameters<typeof manager.register>[0] = { email, password, name, surname, role: rawRole };
     if (parsed.data.orgId) dto.orgId = parsed.data.orgId;
     const { user, role } = await manager.register(dto, caller?.role);
 
     const token = issueToken(
-      { userId: user.id, username: user.email!, orgId: user.orgId!, role },
+      { userId: user.id, email: user.email!, orgId: user.orgId!, role },
       authConfig.jwtTtl,
     );
 
     return c.json(
-      { token, user: { id: user.id, username: user.email!, orgId: user.orgId!, role } },
+      { token, user: { id: user.id, email: user.email!, orgId: user.orgId!, role } },
       201,
     );
   });
 
   /**
    * POST /auth/login
-   * - password strategy: { username, password } → JWT
+   * - password strategy: { email, password } → JWT
    * - firebase strategy: { idToken } → verify Firebase token → JWT
    */
   router.post("/login", async (c) => {
@@ -98,13 +102,13 @@ export function createAuthController(
 
       const { user, role } = found;
       const token = issueToken(
-        { userId: user.id, username: user.email!, orgId: user.orgId!, role },
+        { userId: user.id, email: user.email!, orgId: user.orgId!, role },
         authConfig.jwtTtl,
       );
 
       return c.json({
         token,
-        user: { id: user.id, username: user.email!, orgId: user.orgId!, role },
+        user: { id: user.id, email: user.email!, orgId: user.orgId!, role },
       });
     }
 
@@ -114,13 +118,13 @@ export function createAuthController(
       return c.json({ error: "Bad Request" }, 400);
     }
 
-    const { user, role } = await manager.login(parsed.data.username, parsed.data.password);
+    const { user, role } = await manager.login(parsed.data.email, parsed.data.password);
     const token = issueToken(
-      { userId: user.id, username: user.email!, orgId: user.orgId!, role },
+      { userId: user.id, email: user.email!, orgId: user.orgId!, role },
       authConfig.jwtTtl,
     );
 
-    return c.json({ token, user: { id: user.id, username: user.email!, orgId: user.orgId!, role } });
+    return c.json({ token, user: { id: user.id, email: user.email!, orgId: user.orgId!, role } });
   });
 
   /**
@@ -130,9 +134,12 @@ export function createAuthController(
   router.get("/me", async (c) => {
     const user = c.get("user");
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const fullUser = await manager.getById(user.userId);
     return c.json({
       userId: user.userId,
-      username: user.username,
+      email: user.email,
+      name: fullUser.name,
+      surname: fullUser.surname,
       orgId: user.orgId,
       role: user.role,
     });

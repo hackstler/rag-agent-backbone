@@ -103,7 +103,9 @@ export function createMockOrgRepo(): {
 export function fakeUser(overrides: Partial<User> = {}): User {
   return {
     id: "u-1",
-    email: "alice",
+    email: "alice@test.com",
+    name: null,
+    surname: null,
     orgId: "org-1",
     role: "user",
     metadata: { passwordHash: "hash" },

@@ -30,7 +30,7 @@ describe("Auth API", () => {
 
   describe("POST /auth/register", () => {
     it("first user becomes auto-super_admin without auth header", async () => {
-      const user = fakeUser({ id: "u-1", email: "alice", orgId: "alice" });
+      const user = fakeUser({ id: "u-1", email: "alice@test.com", orgId: "alice" });
       ctx.repos.user.count.mockResolvedValue(0);
       ctx.repos.user.findByEmail.mockResolvedValue(null);
       ctx.repos.user.create.mockResolvedValue(user);
@@ -38,7 +38,7 @@ describe("Auth API", () => {
       const res = await ctx.app.request("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "alice", password: "password123" }),
+        body: JSON.stringify({ email: "alice@test.com", password: "password123" }),
       });
 
       expect(res.status).toBe(201);
@@ -48,7 +48,7 @@ describe("Auth API", () => {
     });
 
     it("second user registration succeeds with super_admin auth", async () => {
-      const user = fakeUser({ id: "u-2", email: "bob", orgId: "bob" });
+      const user = fakeUser({ id: "u-2", email: "bob@test.com", orgId: "bob" });
       ctx.repos.user.count.mockResolvedValue(1);
       ctx.repos.user.findByEmail.mockResolvedValue(null);
       ctx.repos.user.create.mockResolvedValue(user);
@@ -57,9 +57,9 @@ describe("Auth API", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "super_admin" }),
+          ...createAuthHeaders({ userId: "u-1", email: "alice@test.com", orgId: "org-1", role: "super_admin" }),
         },
-        body: JSON.stringify({ username: "bob", password: "password123" }),
+        body: JSON.stringify({ email: "bob@test.com", password: "password123" }),
       });
 
       expect(res.status).toBe(201);
@@ -68,7 +68,7 @@ describe("Auth API", () => {
     });
 
     it("second user registration succeeds with org-scoped admin auth", async () => {
-      const user = fakeUser({ id: "u-3", email: "carol", orgId: "carol" });
+      const user = fakeUser({ id: "u-3", email: "carol@test.com", orgId: "carol" });
       ctx.repos.user.count.mockResolvedValue(1);
       ctx.repos.user.findByEmail.mockResolvedValue(null);
       ctx.repos.user.create.mockResolvedValue(user);
@@ -77,9 +77,9 @@ describe("Auth API", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...createAuthHeaders({ userId: "u-1", username: "alice", orgId: "org-1", role: "admin" }),
+          ...createAuthHeaders({ userId: "u-1", email: "alice@test.com", orgId: "org-1", role: "admin" }),
         },
-        body: JSON.stringify({ username: "carol", password: "password123" }),
+        body: JSON.stringify({ email: "carol@test.com", password: "password123" }),
       });
 
       expect(res.status).toBe(201);
@@ -91,7 +91,7 @@ describe("Auth API", () => {
       const res = await ctx.app.request("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "bob", password: "password123" }),
+        body: JSON.stringify({ email: "bob@test.com", password: "password123" }),
       });
 
       expect(res.status).toBe(403);
@@ -105,7 +105,7 @@ describe("Auth API", () => {
       const passwordHash = hashPassword("password123");
       const user = fakeUser({
         id: "u-1",
-        email: "alice",
+        email: "alice@test.com",
         orgId: "org-1",
         role: "user",
         metadata: { passwordHash },
@@ -115,7 +115,7 @@ describe("Auth API", () => {
       const res = await ctx.app.request("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "alice", password: "password123" }),
+        body: JSON.stringify({ email: "alice@test.com", password: "password123" }),
       });
 
       expect(res.status).toBe(200);
@@ -130,7 +130,7 @@ describe("Auth API", () => {
       const res = await ctx.app.request("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "nonexistent", password: "wrong" }),
+        body: JSON.stringify({ email: "nonexistent@test.com", password: "wrong" }),
       });
 
       expect(res.status).toBe(401);
@@ -141,9 +141,10 @@ describe("Auth API", () => {
 
   describe("GET /auth/me", () => {
     it("returns user info with valid JWT (super_admin)", async () => {
+      ctx.repos.user.findById.mockResolvedValue(fakeUser({ id: "u-1", email: "alice@test.com", name: "Alice", surname: "Smith", orgId: "org-1", role: "super_admin" }));
       const headers = createAuthHeaders({
         userId: "u-1",
-        username: "alice",
+        email: "alice@test.com",
         orgId: "org-1",
         role: "super_admin",
       });
@@ -157,16 +158,19 @@ describe("Auth API", () => {
       const data = await res.json();
       expect(data).toMatchObject({
         userId: "u-1",
-        username: "alice",
+        email: "alice@test.com",
+        name: "Alice",
+        surname: "Smith",
         orgId: "org-1",
         role: "super_admin",
       });
     });
 
     it("returns user info with valid JWT (admin)", async () => {
+      ctx.repos.user.findById.mockResolvedValue(fakeUser({ id: "u-1", email: "alice@test.com", orgId: "org-1", role: "admin" }));
       const headers = createAuthHeaders({
         userId: "u-1",
-        username: "alice",
+        email: "alice@test.com",
         orgId: "org-1",
         role: "admin",
       });
@@ -180,7 +184,7 @@ describe("Auth API", () => {
       const data = await res.json();
       expect(data).toMatchObject({
         userId: "u-1",
-        username: "alice",
+        email: "alice@test.com",
         orgId: "org-1",
         role: "admin",
       });
