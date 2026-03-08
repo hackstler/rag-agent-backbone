@@ -6,6 +6,7 @@ import type { QuoteRepository } from "../../domain/ports/repositories/quote.repo
 import { CatalogService } from "./services/catalog.service.js";
 import { PdfService } from "./services/pdf.service.js";
 import { createCalculateBudgetTool } from "./tools/calculate-budget.tool.js";
+import { createListCatalogTool } from "./tools/list-catalog.tool.js";
 import { createQuoteAgent } from "./quote.agent.js";
 
 export interface QuotePluginDeps {
@@ -25,8 +26,9 @@ export class QuotePlugin implements Plugin {
     const catalogService = new CatalogService();
     const pdfService = new PdfService();
     const calculateBudget = createCalculateBudgetTool({ catalogService, pdfService, attachmentStore, organizationRepo, quoteRepo });
+    const listCatalog = createListCatalogTool({ catalogService });
 
-    this.tools = { calculateBudget };
+    this.tools = { calculateBudget, listCatalog };
     this.agent = createQuoteAgent(this.tools);
   }
 

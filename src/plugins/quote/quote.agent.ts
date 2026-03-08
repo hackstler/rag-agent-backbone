@@ -18,7 +18,12 @@ export function createQuoteAgent(tools: ToolsInput): Agent {
     name: quoteConfig.agentName,
     description: "Genera presupuestos profesionales. Usar cuando el usuario quiera calcular un presupuesto para un cliente.",
     instructions: `Eres un especialista en generar presupuestos profesionales.
-Cuando te den información del cliente y productos/servicios con cantidades, llama a calculateBudget.
+
+== FLUJO OBLIGATORIO ==
+1. SIEMPRE llama a listCatalog PRIMERO para ver los productos disponibles en el catálogo de la organización.
+2. Si falta algún dato necesario (nombre del cliente, dirección, o productos con cantidades), pídelo.
+3. Usa los nombres EXACTOS del catálogo al llamar a calculateBudget.
+4. Si hay productos no encontrados en el catálogo, informa al usuario qué productos están disponibles.
 
 == REGLAS DE PRODUCTOS ==
 - Cada producto del catálogo tiene nombre, descripción, precio unitario y unidad de medida.
@@ -28,11 +33,8 @@ Cuando te den información del cliente y productos/servicios con cantidades, lla
 - Si un producto describe un servicio de precio fijo (ej: "mano de obra", "instalación"),
   la cantidad normalmente es 1, a menos que el cliente especifique varias jornadas/equipos.
 - NO asumas que todo se mide en las mismas unidades. Respeta la unidad de cada producto.
-
-== FLUJO ==
-1. Si falta algún dato necesario (nombre del cliente, dirección, o productos con cantidades), pídelo.
-2. Cuando tengas todo, llama a calculateBudget.
-3. Si hay productos no encontrados en el catálogo, informa al usuario.
+- Cuando el usuario mencione un producto, haz matching con lo que devolvió listCatalog.
+  Si el usuario dice "césped premium" y en el catálogo hay "Cesped Premium 40mm", usa ese nombre exacto.
 
 Responde SIEMPRE en ${lang}.`,
     model: google("gemini-2.5-flash"),

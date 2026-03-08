@@ -1,4 +1,4 @@
-import { eq, and, ilike } from "drizzle-orm";
+import { eq, and, ilike, sql } from "drizzle-orm";
 import { db } from "../../../infrastructure/db/client.js";
 import { catalogs, catalogItems } from "../../../infrastructure/db/schema.js";
 
@@ -37,11 +37,15 @@ export class CatalogService {
   }
 
   /**
-   * Finds a catalog item by code (numeric string) or partial name (case-insensitive).
+   * Finds a catalog item by code (numeric string) or partial name (case+accent insensitive).
    */
   async findItem(catalogId: string, nameOrCode: string): Promise<CatalogItemResult | null> {
     const trimmed = nameOrCode.trim();
     const isNumeric = /^\d+$/.test(trimmed);
+
+    // Strip accents for accent-insensitive matching
+    const normalize = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     const [item] = await db
       .select({
@@ -56,9 +60,10 @@ export class CatalogService {
       .where(
         and(
           eq(catalogItems.catalogId, catalogId),
+          eq(catalogItems.isActive, true),
           isNumeric
             ? eq(catalogItems.code, parseInt(trimmed, 10))
-            : ilike(catalogItems.name, `%${trimmed.replace(/%/g, "\\%").replace(/_/g, "\\_")}%`)
+            : sql`lower(translate(${catalogItems.name}, 'áéíóúÁÉÍÓÚàèìòùÀÈÌÒÙäëïöüÄËÏÖÜñÑ', 'aeiouAEIOUaeiouAEIOUaeiouAEIOUnN')) like lower(${`%${normalize(trimmed).replace(/%/g, "\\%").replace(/_/g, "\\_")}%`})`
         )
       )
       .limit(1);
@@ -89,7 +94,7 @@ export class CatalogService {
         unit: catalogItems.unit,
       })
       .from(catalogItems)
-      .where(eq(catalogItems.catalogId, catalogId))
+      .where(and(eq(catalogItems.catalogId, catalogId), eq(catalogItems.isActive, true)))
       .orderBy(catalogItems.sortOrder);
 
     return rows.map((r) => ({
